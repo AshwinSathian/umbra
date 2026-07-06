@@ -1,5 +1,5 @@
 import type { FetchCssRequest } from "@umbra/shared";
-import { GLOBAL_ENABLED_KEY, siteOverrideKey } from "@umbra/shared";
+import { GLOBAL_ENABLED_KEY, isFetchableCssUrl, siteOverrideKey } from "@umbra/shared";
 
 type SetEnabledMessage = {
   type: "umbra:set-enabled";
@@ -18,7 +18,18 @@ chrome.runtime.onMessage.addListener(
       // fetch of a third-party stylesheet URL, but the extension's own
       // background context is not subject to that page's CSP — the same
       // reason Dark Reader proxies cross-origin CSS fetches through its
-      // background page.
+      // background page. That same elevated context is exactly why the
+      // URL must be validated before fetching: this fetch runs with the
+      // extension's broad host_permissions (a CORS bypass ordinary page
+      // script doesn't have), so an unvalidated URL would let any visited
+      // page use this handler to probe internal/loopback/link-local
+      // addresses via a hidden cross-origin <link>. See
+      // packages/shared/src/url-safety.ts for what's blocked and why.
+      if (!isFetchableCssUrl(message.url)) {
+        sendResponse({ cssText: null, error: "blocked: unsafe or non-public URL" });
+        return true;
+      }
+
       fetch(message.url)
         .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`HTTP ${res.status}`))))
         .then((cssText) => sendResponse({ cssText, error: null }))

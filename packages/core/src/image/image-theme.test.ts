@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { planImageOverrides } from "./image-theme.js";
+import { ImageAnalysisCache, planImageOverrides } from "./image-theme.js";
 import type { PixelGrid } from "./types.js";
 
 function solidGrid(): PixelGrid {
@@ -95,6 +95,91 @@ describe("planImageOverrides", () => {
 
     const overrides = await planImageOverrides(document, async () => solidGrid());
     expect(overrides[0]!.selectorText).toBe('img[src="https://example.com/a\\"b.png"]');
+  });
+
+  it("SECURITY REGRESSION: an embedded newline in src cannot break out of the generated CSS string and inject an independent rule", async () => {
+    // Per the CSS syntax spec, an unescaped literal newline inside a
+    // quoted string terminates the string token early — everything after
+    // it is re-tokenized as fresh, independent CSS. If `src` contained a
+    // raw newline followed by attacker-chosen CSS (e.g.
+    // "...\nbody{background:red!important}"), and the generated selector
+    // didn't escape it, that payload would be parsed as a brand-new,
+    // fully valid rule inside Umbra's own !important @layer stylesheet —
+    // arbitrary CSS injection into a page via a crafted <img src>.
+    const img = document.createElement("img");
+    img.setAttribute("src", "https://example.com/icon.png");
+    const maliciousSrc = 'https://example.com/icon.png?x=1\nbody{background:red!important}';
+    Object.defineProperty(img, "currentSrc", { value: maliciousSrc });
+    document.body.appendChild(img);
+
+    const overrides = await planImageOverrides(document, async () => solidGrid());
+    expect(overrides).toHaveLength(1);
+
+    // The generated selector text must not contain a raw, unescaped
+    // newline anywhere.
+    expect(overrides[0]!.selectorText).not.toMatch(/\n/);
+
+    // Strongest possible check: actually hand the generated selector rule
+    // to a real CSS parser (via a <style> element) and confirm it parses
+    // as exactly one rule targeting the escaped selector — not two rules,
+    // one of which is the attacker's injected "body" rule. (Parsed
+    // without buildLayerStylesheetText's `@layer` wrapper here since this
+    // project's test environment, happy-dom, cannot parse `@layer` at all
+    // — it silently drops the whole block, which would make this
+    // assertion vacuous. The escaping behavior under test is identical
+    // with or without the wrapper: it's a property of the selector
+    // string, not of `@layer`.)
+    const override = overrides[0]!;
+    const cssText = `${override.selectorText} { ${override.properties[0]!.property}: ${override.properties[0]!.value} !important; }`;
+    const styleEl = document.createElement("style");
+    styleEl.textContent = cssText;
+    document.head.appendChild(styleEl);
+
+    const parsedRules = styleEl.sheet!.cssRules;
+    expect(parsedRules.length).toBe(1);
+    expect((parsedRules[0] as CSSStyleRule).selectorText).not.toBe("body");
+    document.head.removeChild(styleEl);
+  });
+
+  it("PERFORMANCE REGRESSION: reuses a shared ImageAnalysisCache instead of re-sampling an unchanged image on a repeated call", async () => {
+    // Without a cache, every call to planImageOverrides (one per
+    // mutation-triggered re-render in apply-theme.ts) re-decodes and
+    // re-classifies every image on the page, even ones whose src never
+    // changed — real, unbounded, repeated OffscreenCanvas decode work on
+    // any page with images and any amount of unrelated DOM churn.
+    const img = document.createElement("img");
+    img.src = "https://example.com/icon.png";
+    document.body.appendChild(img);
+
+    let sampleCallCount = 0;
+    const sampler = async () => {
+      sampleCallCount++;
+      return solidGrid();
+    };
+
+    const cache = new ImageAnalysisCache();
+    const first = await planImageOverrides(document, sampler, true, cache);
+    const second = await planImageOverrides(document, sampler, true, cache);
+
+    expect(sampleCallCount).toBe(1);
+    expect(first).toEqual(second);
+  });
+
+  it("without a cache, re-samples the image again on a repeated call (documents the pre-fix, cache-optional behavior)", async () => {
+    const img = document.createElement("img");
+    img.src = "https://example.com/icon.png";
+    document.body.appendChild(img);
+
+    let sampleCallCount = 0;
+    const sampler = async () => {
+      sampleCallCount++;
+      return solidGrid();
+    };
+
+    await planImageOverrides(document, sampler, true); // no cache passed
+    await planImageOverrides(document, sampler, true); // no cache passed
+
+    expect(sampleCallCount).toBe(2);
   });
 
   it("skips <img> elements with no resolvable src", async () => {
