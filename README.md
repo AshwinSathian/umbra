@@ -1,5 +1,9 @@
 # Umbra
 
+[![CI](https://github.com/AshwinSathian/umbra/actions/workflows/ci.yml/badge.svg)](https://github.com/AshwinSathian/umbra/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](./PLAN-umbra.md)
+
 A free, open-source, cross-browser dark-mode engine for Chrome and Safari — built as a
 constructive overhaul of Dark Reader's approach, with three explicit goals:
 
@@ -16,13 +20,19 @@ and open questions.
 
 ## Status
 
-Phases 0–5 of the plan are built: the core color/DOM/image engine (`packages/core`, 69
-passing unit tests), a working Chrome MV3 extension (`packages/ext-chrome`, verified
-end-to-end against a real Chromium instance — see `tests/e2e/verify-extension.mjs`), and a
-real, buildable macOS Safari Web Extension Xcode project (`packages/ext-safari`, generated
-via Apple's `safari-web-extension-converter` and confirmed to build and launch locally with
-free ad-hoc code signing). Not yet published to the Chrome Web Store or notarized for
-non-technical Safari users — see PLAN-umbra.md Phase 6 and its Open Questions.
+Phases 0–5 of the plan are built: the core color/DOM/image engine (`packages/core` +
+`packages/shared`, 119 passing unit tests), a working Chrome MV3 extension
+(`packages/ext-chrome`, verified end-to-end against a real Chromium instance — see
+`tests/e2e/verify-extension.mjs`), and a real, buildable macOS Safari Web Extension Xcode
+project (`packages/ext-safari`, generated via Apple's `safari-web-extension-converter` and
+confirmed to build and launch locally with free ad-hoc code signing). Not yet published to
+the Chrome Web Store or notarized for non-technical Safari users — see PLAN-umbra.md Phase 6
+and its Open Questions.
+
+The project has also been through a dedicated adversarial security audit and an independent
+architecture/quality audit — see PLAN-umbra.md's "Security Hardening" section for the two
+real vulnerabilities found and fixed, and the "Follow-up Work" / Data Flow sections for the
+quality findings addressed.
 
 ## Development
 
@@ -71,6 +81,20 @@ A signed, notarized build that a non-technical user could install with one click
 than building from source) requires an Apple Developer Program membership ($99/year) — see
 the "Safari distribution funding decision" open question in PLAN-umbra.md. The extension
 itself has no purchase price either way.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). This project follows the
+[Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## Security
+
+Found a vulnerability? Please see [SECURITY.md](./SECURITY.md) — don't open a public issue
+for it.
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

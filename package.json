@@ -6,6 +6,25 @@
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.19.0",
+  "homepage": "https://github.com/AshwinSathian/umbra#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AshwinSathian/umbra.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AshwinSathian/umbra/issues"
+  },
+  "author": "Ashwin Sathian",
+  "keywords": [
+    "browser-extension",
+    "dark-mode",
+    "chrome-extension",
+    "safari-extension",
+    "manifest-v3",
+    "accessibility",
+    "oklch",
+    "typescript"
+  ],
   "engines": {
     "node": ">=20"
   },

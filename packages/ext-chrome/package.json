@@ -2,7 +2,18 @@
   "name": "@umbra/ext-chrome",
   "private": true,
   "version": "0.1.0",
+  "description": "Umbra's Chrome MV3 extension shell — background service worker, content script, popup, and options page.",
+  "license": "MIT",
+  "author": "Ashwin Sathian",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AshwinSathian/umbra.git",
+    "directory": "packages/ext-chrome"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "node build.mjs"
   },

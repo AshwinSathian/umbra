@@ -127,8 +127,20 @@ Page load (document_start)
   → image/sample.ts + classify.ts run per discovered <img>/background-image; only
     classified-as-"flat" images get a targeted override rule in the same layer stylesheet
     (no wrapper DOM elements); <video> and <canvas> are always skipped in v1
-  → mutation-tree.ts watches for DOM/stylesheet/shadow-root changes, re-runs the pipeline
-    incrementally (diffed, not full re-render) on change
+  → mutation-tree.ts watches for DOM/stylesheet/shadow-root changes and batches every
+    mutation within a tick into a single re-render call (not one call per mutation — see
+    Phase 2's task list for the precise claim). **Correction found during a later audit**:
+    this doc originally claimed the re-render itself was "diffed, not full re-render" —
+    that was never true and the code was never changed to match it. Every triggered
+    render recomputes the full theme from scratch (a fresh stylesheet/inline-style walk),
+    which is correct to call "batched," not "diffed." The CSSOM/inline-style walk itself
+    is cheap (linear, no measurable cost at realistic page sizes). The one place this
+    genuinely mattered was image classification, which is real, non-trivial
+    (OffscreenCanvas decode) work and was being redone for every image on every
+    mutation-triggered render with no memoization — fixed by giving image classification
+    its own per-applyTheme-instance cache keyed by resolved URL
+    (`image/image-theme.ts`'s `ImageAnalysisCache`), so only images not already classified
+    get sampled again.
 ```
 
 ### Data Model
@@ -289,6 +301,60 @@ Internal module boundaries only (no public network API in v1):
 - [ ] Run the full Playwright E2E matrix (Chromium + WebKit engines) as a required, green CI gate on the release tag — AC: `pnpm test:e2e` passes in CI for the tagged release commit.
 - [ ] Write a public privacy policy covering the `host_permissions: *://*/*` grant (required by both Chrome Web Store and Apple review) — AC: a `PRIVACY.md` exists, is linked from both store listings, and explicitly states no telemetry/analytics are collected (true per this RFC's Non-Goals).
 **Exit criteria**: A first-time user can install Umbra from a public listing (Chrome Web Store, and whichever Safari path was chosen) without contacting the maintainer, on a machine that has never had the extension before.
+
+## 🔒 Security Hardening (post-v1 audit)
+
+After the phases above shipped, a dedicated adversarial security audit (independent of the
+implementation work — a fresh review against the actual code, not a self-review) found and
+fixed two real, concrete issues. Recorded here rather than silently folded into the phase
+history above, since both represent genuine vulnerabilities a security-conscious reviewer
+would have flagged in the original implementation:
+
+- **CSS injection via unescaped control characters in a generated attribute selector (High
+  severity).** `image/image-theme.ts`'s `escapeAttributeValue` only escaped `\` and `"`
+  before embedding an `<img src>` value into a generated `img[src="..."]` selector. Per the
+  CSS syntax spec, an unescaped literal newline/CR/form-feed inside a quoted string
+  terminates the string token early; everything after it is re-tokenized as fresh CSS —
+  including inside Umbra's own `!important`-marked `@layer` stylesheet, which is
+  specifically designed to win the cascade. A page that lets users embed raw `<img>` tags
+  (a common "safe HTML subset" in forums/wikis/chat apps) with a crafted `src` containing an
+  embedded control character followed by attacker CSS could inject arbitrary, fully valid
+  rules into that trusted stylesheet. **Fix**: every C0 control character and DEL is now
+  hex-escaped using standard CSS escape syntax, not just `\`/`"`; the fallback for
+  `img.currentSrc` was also changed from a raw `getAttribute("src")` read (unresolved, not
+  normalized) to the resolved `img.src` IDL property (goes through URL parsing, which itself
+  strips embedded control characters) as defense in depth. Regression test
+  (`image-theme.test.ts`) constructs the actual exploit payload, verifies the generated
+  selector contains no raw newline, and — the strongest possible check — hands the generated
+  rule to a real CSS parser and confirms it parses as exactly one rule, not two (one of which
+  would be the attacker's injected rule). Verified this test actually fails against the
+  pre-fix implementation before confirming the fix, not just that it passes after.
+- **Unrestricted, SSRF-shaped background fetch for cross-origin CSS (Medium severity).** The
+  background script's `umbra:fetch-css` handler (backed by `dom/cross-origin-cache.ts`)
+  fetched any URL a page's own `<link rel=stylesheet href>` pointed at, with zero
+  protocol/host validation, using the extension's broad `host_permissions` — which grants a
+  CORS bypass ordinary page script does not have. Any visited page could embed a hidden
+  cross-origin `<link>` pointing at an internal address (loopback, RFC 1918 ranges, or
+  link-local/cloud-metadata addresses like `169.254.169.254`) and use the extension's
+  privileged background context to read back the response body. **Fix**:
+  `shared/url-safety.ts`'s `isFetchableCssUrl` rejects non-http(s) schemes and IP-literal
+  loopback/private/link-local addresses (with a documented, accepted residual gap: this is a
+  literal-based check, not DNS-resolution-aware, so a hostname that only resolves to a
+  private address at fetch time — DNS rebinding — is not caught; closing that fully would
+  need a server-side proxy, which doesn't exist for a client-side extension). Wired into the
+  background handler before the `fetch()` call. 12 unit tests cover the boundary cases
+  (loopback, each private range, link-local/cloud-metadata, localhost, non-http(s) schemes,
+  and — to catch over-eager blocking — addresses that merely start with a private-looking
+  octet but are actually public, e.g. `172.32.0.1` is outside `172.16.0.0/12`).
+
+A separate architecture/quality audit (see also the "diffed, not full re-render" correction
+above) additionally surfaced and fixed: an unmemoized image classifier re-decoding every
+image on every mutation-triggered render (now cached per resolved URL — see the Data Flow
+correction above); non-hermetic unit tests silently making real DNS/network calls via
+happy-dom's default link-stylesheet auto-fetching (fixed via `disableCSSFileLoading` in
+`vitest.config.ts`); and a test-script resource-cleanup gap (`tests/e2e/verify-extension.mjs`
+leaking a listening HTTP server on an error path). All are fixed and covered by tests as of
+this section being written.
 
 ## 🧪 Testing Strategy
 

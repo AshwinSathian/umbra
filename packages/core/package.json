@@ -2,9 +2,20 @@
   "name": "@umbra/core",
   "private": true,
   "version": "0.1.0",
+  "description": "Umbra's platform-agnostic color/DOM/image engine — OKLCH recoloring, non-destructive CSS injection, and image/media safety classification.",
+  "license": "MIT",
+  "author": "Ashwin Sathian",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AshwinSathian/umbra.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   }
