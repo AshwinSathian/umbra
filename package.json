@@ -1,0 +1,34 @@
+{
+  "name": "umbra",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A free, cross-browser, image-safe dark mode engine for Chrome and Safari.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "typecheck": "pnpm --filter @umbra/core --filter @umbra/shared --filter @umbra/ui --filter @umbra/ext-chrome exec tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:corpus": "vitest run tests/corpus"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "happy-dom": "^15.11.7",
+    "playwright": "^1.61.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

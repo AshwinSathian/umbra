@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+coverage/
+.turbo/
+*.tsbuildinfo
+xcuserdata/
+DerivedData/
+*.xcarchive
+
+# Synced from packages/ext-chrome/dist by packages/ext-safari/build.mjs — build
+# output, not source; regenerate with `pnpm --filter @umbra/ext-safari build`.
+packages/ext-safari/Umbra/Umbra Extension/Resources/*.js
+packages/ext-safari/Umbra/Umbra Extension/Resources/*.js.map
+packages/ext-safari/Umbra/Umbra Extension/Resources/*.html
+packages/ext-safari/Umbra/Umbra Extension/Resources/manifest.json
+packages/ext-safari/Umbra/Umbra Extension/Resources/icons/
+
+# E2E script output
+tests/e2e/verify-report.json

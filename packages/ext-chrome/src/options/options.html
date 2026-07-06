@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Umbra Settings</title>
+    <style>
+      body {
+        font-family: -apple-system, system-ui, sans-serif;
+        max-width: 480px;
+        margin: 32px auto;
+        padding: 0 16px;
+        background: #121016;
+        color: #eee;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      .row {
+        margin: 18px 0;
+      }
+      label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        margin-bottom: 4px;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .hint {
+        font-size: 11px;
+        color: #999;
+        margin-top: 2px;
+      }
+      button {
+        margin-top: 20px;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: none;
+        background: #3a6ff0;
+        color: white;
+        cursor: pointer;
+      }
+      #saved {
+        font-size: 12px;
+        color: #7ee787;
+        margin-left: 10px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Umbra Settings</h1>
+
+    <div class="row">
+      <label>Background darkness <span id="backgroundLightness-value"></span></label>
+      <input type="range" id="backgroundLightness" min="0.05" max="0.4" step="0.01" />
+    </div>
+
+    <div class="row">
+      <label>Text lightness <span id="foregroundLightness-value"></span></label>
+      <input type="range" id="foregroundLightness" min="0.6" max="0.98" step="0.01" />
+    </div>
+
+    <div class="row">
+      <label>Minimum text contrast (WCAG ratio) <span id="contrastTarget-value"></span></label>
+      <input type="range" id="contrastTarget" min="3" max="10" step="0.5" />
+    </div>
+
+    <div class="row">
+      <label>Brightness <span id="brightness-value"></span></label>
+      <input type="range" id="brightness" min="0.5" max="1.5" step="0.05" />
+    </div>
+
+    <div class="row">
+      <label>Contrast <span id="contrast-value"></span></label>
+      <input type="range" id="contrast" min="0.5" max="1.5" step="0.05" />
+    </div>
+
+    <div class="row">
+      <label>Sepia <span id="sepia-value"></span></label>
+      <input type="range" id="sepia" min="0" max="1" step="0.05" />
+    </div>
+
+    <div class="row">
+      <label>Grayscale <span id="grayscale-value"></span></label>
+      <input type="range" id="grayscale" min="0" max="1" step="0.05" />
+    </div>
+
+    <div class="row">
+      <div class="checkbox-row">
+        <input type="checkbox" id="imageConservativeMode" />
+        <label for="imageConservativeMode" style="margin:0;">Conservative image mode</label>
+      </div>
+      <div class="hint">
+        When on (recommended), any image the classifier isn't confident about is left
+        untouched. Turning this off also recolors images Umbra is uncertain about — photos
+        the classifier confidently recognizes as photos are never recolored either way.
+      </div>
+    </div>
+
+    <button id="reset">Reset to defaults</button>
+    <span id="saved">Saved</span>
+
+    <script src="options.js"></script>
+  </body>
+</html>

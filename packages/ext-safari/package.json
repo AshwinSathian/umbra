@@ -1,0 +1,9 @@
+{
+  "name": "@umbra/ext-safari",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:xcode": "node build.mjs --build"
+  }
+}

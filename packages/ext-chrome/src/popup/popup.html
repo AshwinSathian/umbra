@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Umbra</title>
+    <style>
+      body {
+        width: 220px;
+        font-family: -apple-system, system-ui, sans-serif;
+        padding: 12px;
+        margin: 0;
+        background: #1a1a1a;
+        color: #f0f0f0;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      button {
+        width: 100%;
+        padding: 8px;
+        font-size: 13px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        margin-top: 6px;
+      }
+      #site-toggle {
+        background: #3a6ff0;
+        color: white;
+      }
+      #global-toggle {
+        background: #333;
+        color: #ddd;
+      }
+      #status {
+        font-size: 11px;
+        color: #999;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Umbra</h1>
+    <button id="site-toggle">Toggle for this site</button>
+    <button id="global-toggle">Toggle globally</button>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "@umbra/ext-chrome",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@umbra/core": "workspace:*",
+    "@umbra/shared": "workspace:*",
+    "@umbra/ui": "workspace:*"
+  }
+}
