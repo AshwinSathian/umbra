@@ -50,6 +50,13 @@ function step(name) {
 }
 
 async function main() {
+  // Declared here (not inside the try block below) so the catch block can
+  // still close it if something throws between its creation and its
+  // normal-path close() call — previously cssServer was try-block-scoped,
+  // so an error thrown in that window would leak the listening socket past
+  // the catch block (masked only by this script's own process.exit(1)).
+  let cssServer = null;
+
   const server = http.createServer((req, res) => {
     res.setHeader("Content-Type", "text/html");
     res.end(testPageHtml);
@@ -277,18 +284,29 @@ async function main() {
 
     // Cross-origin stylesheet resolution: serve a second stylesheet from a
     // *different port* (a different origin, so the browser enforces the
-    // same CORS/cssRules-access restriction a real third-party CDN would)
-    // and confirm its background-color rule gets themed via the
-    // background-fetch fallback (dom/cross-origin-cache.ts), not silently
-    // skipped.
-    const cssServer = http.createServer((req, res) => {
+    // same CORS/cssRules-access restriction a real third-party CDN would).
+    //
+    // This necessarily runs on a loopback address (127.0.0.1) since this
+    // script has no real public host to serve from — which, after the
+    // isFetchableCssUrl security fix (packages/shared/src/url-safety.ts),
+    // is now *correctly refused* by the background fetch handler (a
+    // background script with broad host_permissions must not be usable by
+    // any visited page to reach loopback/private/link-local addresses via
+    // a hidden cross-origin <link>). So this check asserts the security
+    // block actually holds end-to-end in the real extension — the
+    // "happy path" for a genuine public host is covered instead by
+    // dom/cross-origin-cache.test.ts (mocked fetcher) and
+    // shared/url-safety.test.ts (the validator's own unit tests), since
+    // reaching a real public CDN from this sandboxed script would be a
+    // flaky, externally-dependent test.
+    cssServer = http.createServer((req, res) => {
       res.setHeader("Content-Type", "text/css");
       res.end(".cross-origin-card { background-color: #ffffff; }");
     });
     await new Promise((resolve) => cssServer.listen(0, resolve));
     const cssPort = cssServer.address().port;
 
-    step("append cross-origin link");
+    step("append cross-origin (loopback) link");
     await page.evaluate((cssPort) => {
       const link = document.createElement("link");
       link.rel = "stylesheet";
@@ -300,15 +318,15 @@ async function main() {
       document.body.appendChild(div);
     }, cssPort);
 
-    step("waiting for cross-origin fetch + re-render");
+    step("waiting for cross-origin fetch attempt + re-render");
     await page.waitForTimeout(1500); // link load + background fetch round-trip + re-render
 
     const crossOriginBg = await page.evaluate(
       () => getComputedStyle(document.querySelector(".cross-origin-card")).backgroundColor,
     );
     results.checks.push({
-      name: "a cross-origin stylesheet's rule is themed via the background-fetch fallback",
-      pass: crossOriginBg !== "rgb(255, 255, 255)",
+      name: "a cross-origin stylesheet on a loopback address is correctly BLOCKED by the URL-safety check, not fetched",
+      pass: crossOriginBg === "rgb(255, 255, 255)",
       detail: crossOriginBg,
     });
     cssServer.close();
@@ -347,6 +365,22 @@ async function main() {
       // to the extension's background, auto-spinning up a fresh service
       // worker if the old one was terminated. Uses a fresh popup page
       // rather than the earlier (possibly stale-referencing) one.
+      //
+      // This check is specifically about service-worker resilience (does
+      // a fresh worker respawn and correctly answer a message after
+      // force-termination?) — it is deliberately NOT trying to also
+      // verify exact tab-targeting here. As established earlier in this
+      // script, opening the popup as a plain new tab always makes *that
+      // tab* active (creating/navigating a tab beats any prior
+      // bringToFront() call), so popup.js's chrome.tabs.query({active:
+      // true}) resolves to the popup's own chrome-extension:// URL in
+      // this harness — a Playwright test-double artifact, not a product
+      // bug (already independently confirmed and exercised via the
+      // direct message-contract checks above, which don't have this
+      // artifact). So the assertion here only checks that the message
+      // round-trip itself succeeded and returned a well-formed answer —
+      // proof the respawned worker is alive and its listeners are
+      // registered — not which origin string came back.
       const resiliencePopup = await context.newPage();
       await resiliencePopup.goto(`chrome-extension://${extensionId}/popup.html`);
       await freshWorkerPromise;
@@ -384,11 +418,13 @@ async function main() {
 
     await context.close();
     server.close();
+    cssServer?.close();
     process.exit(allPass ? 0 : 1);
   } catch (err) {
     console.error(err);
     await context.close();
     server.close();
+    cssServer?.close();
     process.exit(1);
   }
 }

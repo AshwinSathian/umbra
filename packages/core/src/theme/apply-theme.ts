@@ -13,7 +13,7 @@ import { InlineRewriteTracker } from "../dom/inline-rewrite-tracker.js";
 import { type DisposeFn, observeMutations } from "../dom/mutation-tree.js";
 import { OriginalValueCache } from "../dom/original-value-cache.js";
 import type { ImageSampler } from "../image/image-theme.js";
-import { planImageOverrides } from "../image/image-theme.js";
+import { ImageAnalysisCache, planImageOverrides } from "../image/image-theme.js";
 import { DEFAULT_THEME_SETTINGS, type ThemeSettings, computeTheme } from "./theme-engine.js";
 
 /**
@@ -71,6 +71,11 @@ export function applyTheme(
   // value, never from our own previous output — see original-value-cache.ts
   // for why this is load-bearing, not an optimization.
   const originalValues = new OriginalValueCache();
+  // Memoizes image classification by URL across renders — without this, a
+  // page with many images re-decodes and re-classifies every single one
+  // on every mutation-triggered re-render, even ones whose src never
+  // changed. See image/image-theme.ts's ImageAnalysisCache doc comment.
+  const imageAnalysisCache = new ImageAnalysisCache();
   let latestImageOverrides: SelectorOverride[] = [];
   let imageScanInFlight = false;
   let crossOriginScanInFlight = false;
@@ -120,7 +125,7 @@ export function applyTheme(
   function maybeScanImages() {
     if (!options.imageSampler || imageScanInFlight || !useLayers) return;
     imageScanInFlight = true;
-    planImageOverrides(doc, options.imageSampler, imageConservativeMode)
+    planImageOverrides(doc, options.imageSampler, imageConservativeMode, imageAnalysisCache)
       .then((overrides) => {
         imageScanInFlight = false;
         if (disposed) return;
