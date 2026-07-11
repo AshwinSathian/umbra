@@ -66,9 +66,9 @@ async function readStoredThemeSettings(): Promise<StoredThemeSettings> {
   return { ...DEFAULT_STORED_THEME_SETTINGS, ...(stored[THEME_SETTINGS_KEY] as Partial<StoredThemeSettings>) };
 }
 
-async function start() {
+async function start(preloadedSettings?: StoredThemeSettings) {
   if (currentDispose) return;
-  const themeSettings = await readStoredThemeSettings();
+  const themeSettings = preloadedSettings ?? (await readStoredThemeSettings());
   if (currentDispose) return; // a concurrent start() won the race while we awaited storage
   currentDispose = applyTheme(document, window, toThemeOptions(themeSettings));
 }
@@ -83,17 +83,25 @@ async function restart() {
   await start();
 }
 
-async function readEnabledState(): Promise<boolean> {
+/** A single combined read of both the enabled-state keys and the theme
+ * settings, used only on initial page load: the two were previously two
+ * sequential `chrome.storage.local.get` round-trips (enabled-check, then
+ * settings), which directly adds to the delay before first themed paint —
+ * one round-trip halves that latency. Toggle/restart paths still use
+ * `readStoredThemeSettings()` alone since they don't need the enabled
+ * check (the caller already knows the desired state). */
+async function init() {
   const origin = location.origin;
-  const stored = await chrome.storage.local.get([GLOBAL_ENABLED_KEY, siteOverrideKey(origin)]);
+  const stored = await chrome.storage.local.get([GLOBAL_ENABLED_KEY, siteOverrideKey(origin), THEME_SETTINGS_KEY]);
   const globallyEnabled = stored[GLOBAL_ENABLED_KEY] !== false; // default true
   const override = stored[siteOverrideKey(origin)] as SiteOverride | undefined;
-  return resolveEnabled(globallyEnabled, override);
-}
-
-async function init() {
-  const enabled = await readEnabledState();
-  if (enabled) await start();
+  const enabled = resolveEnabled(globallyEnabled, override);
+  if (!enabled) return;
+  const themeSettings = {
+    ...DEFAULT_STORED_THEME_SETTINGS,
+    ...(stored[THEME_SETTINGS_KEY] as Partial<StoredThemeSettings>),
+  };
+  await start(themeSettings);
 }
 
 chrome.runtime.onMessage.addListener((message: { type?: string; origin?: string; enabled?: boolean }) => {

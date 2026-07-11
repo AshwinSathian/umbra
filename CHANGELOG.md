@@ -21,6 +21,21 @@ All notable changes to this project are documented in this file. The format is b
   extension in a real Chromium instance via Playwright.
 - `PLAN-darkframe.md`: the project's architecture RFC and running design/bug log.
 
+### Changed
+
+- Renamed the project from "Umbra" to "Darkframe" (npm scope, extension name, internal
+  message/storage-key prefixes, injected CSS layer name, Safari Xcode project) after
+  discovering an existing, active, same-category Chrome extension called "Umbra Dark Mode"
+  during shipping-readiness review. See PLAN-darkframe.md's Appendix C.
+- Chrome: dropped the `tabs` permission — `host_permissions` (`http://*/*`, `https://*/*`)
+  already grants `chrome.tabs.query()` access to `tab.url`/`title`/`favIconUrl`, so the
+  separate permission was pure surface area with no functional benefit. Verified via
+  `tests/e2e/verify-extension.mjs` that popup tab-origin resolution and background-to-tab
+  messaging are unaffected.
+- Chrome content script: merged the two sequential `chrome.storage.local.get` calls on
+  initial page load (enabled-state check, then theme settings) into one, halving the
+  storage round-trip latency before first themed paint.
+
 ### Fixed
 
 - CSS injection via unescaped control characters in a generated image-selector attribute
@@ -37,7 +52,20 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Known gaps (tracked, not silently dropped)
 
-- No FOUC (flash of unstyled content) mitigation yet on first paint.
+- No FOUC (flash of unstyled content) mitigation yet on first paint (the initial
+  `chrome.storage.local` round-trip was halved — see Changed — but the flash itself isn't
+  eliminated). Designed but deliberately not implemented in this pass: a synchronous
+  "optimistic curtain" using the page's own `localStorage` (readable synchronously by an
+  isolated-world content script at `document_start`, unlike `chrome.storage`) as a
+  same-origin cache of "this origin was dark last visit," painting an unlayered
+  `!important` `html,body{background;color}` rule immediately, which is automatically
+  superseded once the real `@layer darkframe {...} !important` theme applies (per the CSS
+  Cascading spec, layered-important beats unlayered-important). Scoped out of this pass
+  because it (a) writes a small marker key into the *page's* own `localStorage`, a real
+  though minor expansion of the footprint PRIVACY.md currently describes, which would need
+  a docs update to stay accurate, and (b) its actual paint-timing benefit needs verification
+  against real browser paint events, not just post-load DOM assertions — the existing E2E
+  harness doesn't cover that. Follow-up work, not abandoned.
 - No 20-site regression corpus yet (`tests/corpus/`) — real-browser E2E coverage exists but
   is narrower in breadth than the full corpus PLAN-darkframe.md calls for.
 - Background-image CSS (`background-image: url(...)`) is not recolored — only `<img>`
