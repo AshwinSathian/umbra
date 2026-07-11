@@ -1,7 +1,7 @@
 {
   "name": "@darkframe/ext-chrome",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Darkframe's Chrome MV3 extension shell — background service worker, content script, popup, and options page.",
   "license": "MIT",
   "author": "Ashwin Sathian",

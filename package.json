@@ -1,7 +1,7 @@
 {
   "name": "darkframe",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A free, cross-browser, image-safe dark mode engine for Chrome and Safari.",
   "license": "MIT",
   "type": "module",

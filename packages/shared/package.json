@@ -1,7 +1,7 @@
 {
   "name": "@darkframe/shared",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Typed messages, storage keys, settings schema, and URL-safety validation shared by Darkframe's Chrome and Safari extension shells.",
   "license": "MIT",
   "author": "Ashwin Sathian",

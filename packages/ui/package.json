@@ -1,7 +1,7 @@
 {
   "name": "@darkframe/ui",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Reserved Preact-based UI components for Darkframe's extension shells (currently unused — popup/options are hand-written vanilla TypeScript; see PLAN-darkframe.md's Follow-up Work).",
   "license": "MIT",
   "author": "Ashwin Sathian",

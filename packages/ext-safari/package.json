@@ -1,7 +1,7 @@
 {
   "name": "@darkframe/ext-safari",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Darkframe's Safari Web Extension shell — a macOS Xcode project wrapping the shared web-extension bundle, plus the resource-sync build script.",
   "license": "MIT",
   "author": "Ashwin Sathian",
