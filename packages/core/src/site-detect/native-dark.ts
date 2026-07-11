@@ -6,7 +6,7 @@ export type NativeDarkResult = {
 };
 
 /**
- * Detects whether a page has already shipped its own dark theme, so Umbra
+ * Detects whether a page has already shipped its own dark theme, so Darkframe
  * can back off entirely rather than double-theming it. Checks are ordered
  * cheapest-first and short-circuit — the `<meta>`/computed-style checks
  * never need to touch layout, and a full-page sampling fallback (as Dark

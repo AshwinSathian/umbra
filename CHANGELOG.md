@@ -19,14 +19,14 @@ All notable changes to this project are documented in this file. The format is b
 - Safari Web Extension (`packages/ext-safari`): a real, buildable macOS Xcode project.
 - End-to-end verification (`tests/e2e/verify-extension.mjs`) driving the real built
   extension in a real Chromium instance via Playwright.
-- `PLAN-umbra.md`: the project's architecture RFC and running design/bug log.
+- `PLAN-darkframe.md`: the project's architecture RFC and running design/bug log.
 
 ### Fixed
 
 - CSS injection via unescaped control characters in a generated image-selector attribute
-  value (High severity — see PLAN-umbra.md's Security Hardening section).
+  value (High severity — see PLAN-darkframe.md's Security Hardening section).
 - Unrestricted background fetch for cross-origin CSS, reachable by any visited page to probe
-  internal/loopback/private-network addresses (Medium severity — see PLAN-umbra.md).
+  internal/loopback/private-network addresses (Medium severity — see PLAN-darkframe.md).
 - Image classifier re-decoding every image on every mutation-triggered re-render with no
   cache (real, unbounded performance cost on image-heavy pages).
 - A disconnected `MutationObserver` not cancelling an already-scheduled callback, which could
@@ -39,7 +39,7 @@ All notable changes to this project are documented in this file. The format is b
 
 - No FOUC (flash of unstyled content) mitigation yet on first paint.
 - No 20-site regression corpus yet (`tests/corpus/`) — real-browser E2E coverage exists but
-  is narrower in breadth than the full corpus PLAN-umbra.md calls for.
+  is narrower in breadth than the full corpus PLAN-darkframe.md calls for.
 - Background-image CSS (`background-image: url(...)`) is not recolored — only `<img>`
   elements are, since a `filter` on an element with a background-image would also incorrectly
   recolor its rendered children/text.

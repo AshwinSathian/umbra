@@ -81,7 +81,7 @@ describe("discoverStylesheets", () => {
     expect(linkEntry?.corsBlocked).toBe(true);
   });
 
-  it("REGRESSION: never discovers Umbra's own managed stylesheet as page content", () => {
+  it("REGRESSION: never discovers Darkframe's own managed stylesheet as page content", () => {
     // Without this exclusion, a second theme render would find its own
     // previously-injected @layer stylesheet, walk into its rules (an
     // @layer block has .cssRules like any grouping rule), and recolor its
@@ -92,7 +92,7 @@ describe("discoverStylesheets", () => {
     const managed = document.createElement("style");
     managed.id = MANAGED_STYLE_ID;
     managed.setAttribute(MANAGED_STYLE_MARKER_ATTR, "true");
-    managed.textContent = "@layer umbra { body { background-color: rgba(72, 72, 72, 1) !important; } }";
+    managed.textContent = "@layer darkframe { body { background-color: rgba(72, 72, 72, 1) !important; } }";
     document.head.appendChild(managed);
 
     const found = discoverStylesheets(document);

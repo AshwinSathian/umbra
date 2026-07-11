@@ -1,4 +1,4 @@
-import { DEFAULT_STORED_THEME_SETTINGS, THEME_SETTINGS_KEY, type StoredThemeSettings } from "@umbra/shared";
+import { DEFAULT_STORED_THEME_SETTINGS, THEME_SETTINGS_KEY, type StoredThemeSettings } from "@darkframe/shared";
 
 const SLIDER_KEYS = [
   "backgroundLightness",
@@ -42,7 +42,7 @@ async function broadcastSettingsChanged() {
   const tabs = await chrome.tabs.query({});
   for (const tab of tabs) {
     if (tab.id === undefined) continue;
-    chrome.tabs.sendMessage(tab.id, { type: "umbra:settings-changed" }).catch(() => {
+    chrome.tabs.sendMessage(tab.id, { type: "darkframe:settings-changed" }).catch(() => {
       // No content script listening in this tab — expected for non-http(s) tabs.
     });
   }

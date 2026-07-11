@@ -106,7 +106,7 @@ describe("computeTheme", () => {
     // This reproduces a real bug found in a live browser: an inline-style
     // element's declaration is mutated in place (see
     // dom/inline-rewrite-tracker.ts), so on a second render the "current"
-    // DOM value a naive read would see is already Umbra's own prior
+    // DOM value a naive read would see is already Darkframe's own prior
     // output. Recoloring that again is not a no-op — the pole-based remap
     // is a contraction toward a fixed point, not idempotent — which
     // caused the recolored value to drift by a tiny amount on every

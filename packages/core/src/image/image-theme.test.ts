@@ -104,7 +104,7 @@ describe("planImageOverrides", () => {
     // raw newline followed by attacker-chosen CSS (e.g.
     // "...\nbody{background:red!important}"), and the generated selector
     // didn't escape it, that payload would be parsed as a brand-new,
-    // fully valid rule inside Umbra's own !important @layer stylesheet —
+    // fully valid rule inside Darkframe's own !important @layer stylesheet —
     // arbitrary CSS injection into a page via a crafted <img src>.
     const img = document.createElement("img");
     img.setAttribute("src", "https://example.com/icon.png");

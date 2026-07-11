@@ -6,7 +6,7 @@ import {
   DEFAULT_FOREGROUND_POLES,
   applyTheme,
   sampleImageFromUrl,
-} from "@umbra/core";
+} from "@darkframe/core";
 import {
   DEFAULT_STORED_THEME_SETTINGS,
   GLOBAL_ENABLED_KEY,
@@ -15,7 +15,7 @@ import {
   THEME_SETTINGS_KEY,
   resolveEnabled,
   siteOverrideKey,
-} from "@umbra/shared";
+} from "@darkframe/shared";
 
 let currentDispose: DisposeFn | null = null;
 
@@ -52,7 +52,7 @@ function toThemeOptions(stored: StoredThemeSettings): ApplyThemeOptions {
  * third-party URL, but the background context is not subject to it. */
 async function fetchCssFromBackground(url: string): Promise<string | null> {
   try {
-    const response = (await chrome.runtime.sendMessage({ type: "umbra:fetch-css", url })) as {
+    const response = (await chrome.runtime.sendMessage({ type: "darkframe:fetch-css", url })) as {
       cssText: string | null;
     };
     return response?.cssText ?? null;
@@ -97,11 +97,11 @@ async function init() {
 }
 
 chrome.runtime.onMessage.addListener((message: { type?: string; origin?: string; enabled?: boolean }) => {
-  if (message?.type === "umbra:settings-changed") {
+  if (message?.type === "darkframe:settings-changed") {
     if (currentDispose) void restart();
     return;
   }
-  if (message?.type !== "umbra:toggle") return;
+  if (message?.type !== "darkframe:toggle") return;
   if (message.origin !== undefined && message.origin !== location.origin) return;
   if (message.enabled) void start();
   else stop();

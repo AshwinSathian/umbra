@@ -1,8 +1,8 @@
 {
-  "name": "@umbra/ext-safari",
+  "name": "@darkframe/ext-safari",
   "private": true,
   "version": "0.1.0",
-  "description": "Umbra's Safari Web Extension shell — a macOS Xcode project wrapping the shared web-extension bundle, plus the resource-sync build script.",
+  "description": "Darkframe's Safari Web Extension shell — a macOS Xcode project wrapping the shared web-extension bundle, plus the resource-sync build script.",
   "license": "MIT",
   "author": "Ashwin Sathian",
   "repository": {

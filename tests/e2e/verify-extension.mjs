@@ -13,7 +13,7 @@
 // that Chromium's legacy `headless: true` mode does not load extensions at
 // all (the service worker never registers), unlike a real headed browser.
 // Wiring this into CI would need `--headless=new` and/or Xvfb, which is
-// deferred alongside the Safari E2E CI gap already noted in PLAN-umbra.md.
+// deferred alongside the Safari E2E CI gap already noted in PLAN-darkframe.md.
 import { chromium } from "playwright";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,7 +78,7 @@ async function main() {
     step("open page");
     const page = await context.newPage();
     page.on("console", (msg) => {
-      if (msg.text().includes("umbra-debug")) console.log("PAGE:", msg.text());
+      if (msg.text().includes("darkframe-debug")) console.log("PAGE:", msg.text());
     });
     step("goto url");
     await page.goto(url);
@@ -199,8 +199,8 @@ async function main() {
     // in a script with no competing newPage() call resolves the origin and
     // toggles correctly — this is a Playwright test-harness limitation,
     // not a bug in popup.ts.) So this check instead drives the exact same
-    // background message contract (`umbra:set-enabled` -> storage write ->
-    // `umbra:toggle` broadcast to every tab) directly from the service
+    // background message contract (`darkframe:set-enabled` -> storage write ->
+    // `darkframe:toggle` broadcast to every tab) directly from the service
     // worker's own context, which — unlike a Playwright tab — never
     // steals "active tab" status. This validates the real product logic
     // (storage + messaging + content-script response), which is what the
@@ -210,12 +210,12 @@ async function main() {
     async function setEnabled(enabled) {
       return serviceWorker.evaluate(
         async ({ origin, enabled }) => {
-          await chrome.storage.local.set({ [`umbra:site:${origin}`]: enabled ? "force-on" : "force-off" });
+          await chrome.storage.local.set({ [`darkframe:site:${origin}`]: enabled ? "force-on" : "force-off" });
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) {
             if (tab.id === undefined) continue;
             try {
-              await chrome.tabs.sendMessage(tab.id, { type: "umbra:toggle", origin, enabled });
+              await chrome.tabs.sendMessage(tab.id, { type: "darkframe:toggle", origin, enabled });
             } catch {
               // tab has no content script listening (e.g. the popup tab) — expected
             }
@@ -408,7 +408,7 @@ async function main() {
     const reportPath = path.join(dir, "verify-report.json");
     writeFileSync(reportPath, JSON.stringify(results, null, 2));
 
-    console.log("\n=== Umbra Chrome extension E2E verification ===");
+    console.log("\n=== Darkframe Chrome extension E2E verification ===");
     let allPass = true;
     for (const check of results.checks) {
       console.log(`${check.pass ? "PASS" : "FAIL"} — ${check.name} (${JSON.stringify(check.detail)})`);

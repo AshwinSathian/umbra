@@ -1,4 +1,4 @@
-# RFC: Umbra — A Free, Cross-Browser, Image-Safe Dark Mode Engine
+# RFC: Darkframe — A Free, Cross-Browser, Image-Safe Dark Mode Engine
 > Status: OPEN FOR REVIEW
 > Scale: Epic
 > Target start: 2026-07-07
@@ -26,7 +26,7 @@ Additionally, Safari is a **paid, second-class product** for Dark Reader (~$4.99
 
 ## 📘 Background
 
-**Current state**: No code exists yet. This is a new repository at `/Users/ashwinsathian/Documents/Personal/umbra`, initialized with git, no commits.
+**Current state**: No code exists yet. This is a new repository at `/Users/ashwinsathian/Documents/Personal/darkframe`, initialized with git, no commits.
 
 **Prior art studied directly**: The `darkreader/darkreader` GitHub repository was cloned and read at the source level (not just documentation) to ground this RFC in real, current (as of the July 2026 clone) implementation details rather than assumptions. Specific findings that shape this design are cited by file path throughout (see Appendix A for the full index). Web research covered Chrome Web Store reviews, GitHub issues, Reddit/forum threads, and Apple's Safari Web Extension distribution documentation.
 
@@ -38,7 +38,7 @@ Additionally, Safari is a **paid, second-class product** for Dark Reader (~$4.99
 **Prior attempts**: None — greenfield.
 
 **Glossary**:
-- *Dynamic theme*: runtime-computed recoloring of a page's actual resolved styles (Dark Reader's primary mode, and Umbra's only mode in v1).
+- *Dynamic theme*: runtime-computed recoloring of a page's actual resolved styles (Dark Reader's primary mode, and Darkframe's only mode in v1).
 - *FOUC*: Flash Of Unstyled/un-Themed Content — the light flash visible before a dark theme applies.
 - *OKLCH*: a perceptually uniform cylindrical color space (Lightness, Chroma, Hue) where equal numeric steps correspond to roughly equal perceived steps, unlike HSL.
 - *Cascade Layers*: the CSS `@layer` mechanism (broadly supported: Chrome 99+, Safari 15.4+) for controlling rule precedence independent of specificity/source order.
@@ -50,7 +50,7 @@ This RFC is aggressive about scope. The following are **explicitly out of scope 
 - **No canvas/WebGL pixel-level theming.** Google Docs, Figma, Notion's canvas-rendered layers, and similar apps will not have their canvas *contents* recolored. This is a structural limitation of any CSS/DOM-injection extension (confirmed via Dark Reader's own unresolved GitHub #8730 discussion) — v1 leaves canvas elements completely untouched, full stop, rather than attempting a partial/buggy fix.
 - **No Firefox, Edge, or Opera builds.** The core engine is written to be portable (standard WebExtension APIs only), but only Chrome (MV3) and Safari (macOS Web Extension) are built and shipped in this plan. Firefox/Edge/Opera are a follow-up, not a v1 deliverable.
 - **No monetization of any kind.** No paid tier, no "Plus" engine, no in-app purchase, on any platform including Safari. If Apple Developer Program fees are incurred for signed distribution, they are absorbed by the project, never passed to the user as a purchase price.
-- **No monolithic per-site manual-fix database at launch.** Umbra v1 relies on better generic heuristics (image classification, native dark-mode cooperation) rather than a bundled site-specific override file. A small number of hand-verified fixes for the regression corpus are acceptable; a crowd-sourced 40k-line file is explicitly deferred (Follow-up Work).
+- **No monolithic per-site manual-fix database at launch.** Darkframe v1 relies on better generic heuristics (image classification, native dark-mode cooperation) rather than a bundled site-specific override file. A small number of hand-verified fixes for the regression corpus are acceptable; a crowd-sourced 40k-line file is explicitly deferred (Follow-up Work).
 - **No iOS/iPadOS Safari in v1.** Only macOS Safari is targeted initially — iOS Safari App Extensions cannot be side-loaded at all (App Store distribution is mandatory), which is a materially different distribution problem addressed in Phase 4/Follow-up, not Phase 0–3.
 - **No custom per-site user scripting / Dev-Tools-style fix editor UI.** Dark Reader's power-user "Dev Tools" CSS editor panel is not built in v1; users get on/off, brightness/contrast/sepia sliders, and a native-dark-mode toggle only.
 
@@ -94,7 +94,7 @@ This RFC is aggressive about scope. The following are **explicitly out of scope 
 | `packages/core/color/recolor.ts` | New | solo | Replaces Dark Reader's `modify-colors.ts` HSL remap with OKLCH lightness-curve remap |
 | `packages/core/image/sample.ts` | New | solo | OffscreenCanvas downsample + per-cell lightness/variance/edge-gradient sampling |
 | `packages/core/image/classify.ts` | New | solo | Decision policy: photo vs icon vs solid-color, "default to untouched" bias |
-| `packages/core/theme/layer-injector.ts` | New | solo | Emits a single `@layer umbra` stylesheet per page instead of rewriting page stylesheets in place |
+| `packages/core/theme/layer-injector.ts` | New | solo | Emits a single `@layer darkframe` stylesheet per page instead of rewriting page stylesheets in place |
 | `packages/core/dom/style-discovery.ts` | New | solo | Enumerates `<style>`/`<link>`/adoptedStyleSheets, resolves cross-origin via background fetch port |
 | `packages/core/dom/mutation-tree.ts` | New | solo | Shadow-DOM-aware MutationObserver tree, batched updates |
 | `packages/core/site-detect/native-dark.ts` | New | solo | `prefers-color-scheme`/`color-scheme` + minimal sampling to detect already-dark sites |
@@ -102,7 +102,7 @@ This RFC is aggressive about scope. The following are **explicitly out of scope 
 | `packages/ext-chrome/manifest.json` | New | solo | MV3 manifest: service worker, content scripts, `host_permissions` |
 | `packages/ext-chrome/background/sw.ts` | New | solo | Stateless-by-design service worker: rehydrates all state from `chrome.storage` on every wake |
 | `packages/ext-chrome/content/inject.ts` | New | solo | Content-script entry, wires core modules to the live DOM |
-| `packages/ext-safari/Umbra.xcodeproj` | New | solo | Xcode project wrapping the same built extension resources via `xcrun safari-web-extension-converter` bootstrap, then hand-maintained |
+| `packages/ext-safari/Darkframe.xcodeproj` | New | solo | Xcode project wrapping the same built extension resources via `xcrun safari-web-extension-converter` bootstrap, then hand-maintained |
 | `packages/ui/popup`, `packages/ui/options` | New | solo | Shared Preact UI consumed by both platform shells |
 | `tests/corpus/` | New | solo | Fixed 20-site regression corpus (static HTML snapshots) for image-safety and footprint tests |
 | `tests/e2e/` | New | solo | Playwright test matrix (Chrome + Safari via WebKit) |
@@ -122,7 +122,7 @@ Page load (document_start)
   → recolor.ts converts every resolved color to OKLCH, remaps lightness via a continuous
     monotonic curve (not per-hue branches), solves text-color lightness against actual
     resolved background for WCAG contrast
-  → layer-injector.ts emits ONE `@layer umbra { ... }` stylesheet containing the override
+  → layer-injector.ts emits ONE `@layer darkframe { ... }` stylesheet containing the override
     rules — original page stylesheets are never mutated
   → image/sample.ts + classify.ts run per discovered <img>/background-image; only
     classified-as-"flat" images get a targeted override rule in the same layer stylesheet
@@ -148,7 +148,7 @@ Page load (document_start)
 Shared settings schema (`packages/core/state/settings-schema.ts`), stored via `chrome.storage.local` on Chrome and `browser.storage.local` (WKWebExtension-backed) on Safari:
 
 ```ts
-type UmbraSettings = {
+type DarkframeSettings = {
   version: 1;
   enabledGlobally: boolean;
   siteOverrides: Record<string /* origin */, 'force-on' | 'force-off' | 'default'>;
@@ -171,9 +171,9 @@ No server-side data model — this is a fully client-side extension with no back
 ### API Design
 
 Internal module boundaries only (no public network API in v1):
-- `core/theme/theme-engine.ts` exports `computeTheme(doc: Document, settings: UmbraSettings): ThemeResult` — pure function over a DOM snapshot, platform-agnostic, unit-testable without a browser extension harness (works against jsdom/happy-dom in Vitest).
+- `core/theme/theme-engine.ts` exports `computeTheme(doc: Document, settings: DarkframeSettings): ThemeResult` — pure function over a DOM snapshot, platform-agnostic, unit-testable without a browser extension harness (works against jsdom/happy-dom in Vitest).
 - `core/dom/layer-injector.ts` exports `applyTheme(doc: Document, result: ThemeResult): DisposeFn` — the only function that touches the live DOM; returns a disposer that fully reverts all changes (used both for toggling off and for tests asserting clean teardown).
-- **Correction found during implementation**: `@layer` alone does not make an additive override win against the page's own CSS. Per the CSS Cascading spec, within *normal* importance, unlayered author rules always beat layered author rules regardless of specificity — so a plain `@layer umbra { ... }` block would silently lose to any of the page's own (unlayered) color declarations. The fix: every declaration emitted inside `@layer umbra` is marked `!important`. `!important` inverts the layer/unlayered precedence (important layered rules beat important *and* normal unlayered rules), so the override wins against the common case (page rules with normal importance) while still living in one additive, non-mutating stylesheet. The one accepted edge case (documented in Risks) is a page that already declares `!important` on the same property for the same element — a genuinely rare pattern for basic color declarations — where the override may lose; this degrades gracefully to "that one declaration stays untouched," not a crash, and the CSSOM-rewrite fallback path does not share this limitation since it mutates the winning rule directly.
+- **Correction found during implementation**: `@layer` alone does not make an additive override win against the page's own CSS. Per the CSS Cascading spec, within *normal* importance, unlayered author rules always beat layered author rules regardless of specificity — so a plain `@layer darkframe { ... }` block would silently lose to any of the page's own (unlayered) color declarations. The fix: every declaration emitted inside `@layer darkframe` is marked `!important`. `!important` inverts the layer/unlayered precedence (important layered rules beat important *and* normal unlayered rules), so the override wins against the common case (page rules with normal importance) while still living in one additive, non-mutating stylesheet. The one accepted edge case (documented in Risks) is a page that already declares `!important` on the same property for the same element — a genuinely rare pattern for basic color declarations — where the override may lose; this degrades gracefully to "that one declaration stays untouched," not a crash, and the CSSOM-rewrite fallback path does not share this limitation since it mutates the winning rule directly.
 - Chrome↔content-script↔background messaging: a typed `postMessage`/`chrome.runtime.sendMessage` protocol defined once in `packages/shared/messages.ts`, used identically by both the Chrome and Safari builds (Safari's WKWebExtension message-passing is API-compatible with Chrome's for this subset).
 
 ### Infrastructure Changes
@@ -196,7 +196,7 @@ Internal module boundaries only (no public network API in v1):
 - **Cascade Layers require a feature-detection fallback.** `@layer` is supported in Chrome 99+ and Safari 15.4+, which covers the vast majority of the target audience, but any user on an older WebKit build falls back to a CSSOM-rewrite-in-place strategy (Phase 2 must implement both paths). This adds real implementation complexity in exchange for the footprint win on modern browsers.
 - **Conservative image classification will under-recolor some icons.** Biasing hard toward "if uncertain, don't touch it" (per the hard requirement) means some flat-color icons that *should* be recolored will be left in their original light-mode colors on the darkened page. This is an explicit, accepted tradeoff: a wrong-but-visible light icon is a cosmetic issue; an altered photo is the failure mode we are eliminating.
 - **Safari's genuinely-free distribution has real friction.** Building from source via Xcode is 100% free but requires the end user to have Xcode installed and run a build themselves — real friction for a non-technical user. The alternative (maintainer-funded signed/notarized direct distribution) removes that friction but commits the project to an ongoing $99/year personal cost. This RFC accepts both paths coexisting (Phase 4) rather than picking one, and flags the funding commitment as an explicit Open Question requiring your sign-off.
-- **No crowd-sourced per-site fix file at launch means some long-tail sites will look worse than on Dark Reader on day one.** Dark Reader's 40k-line fix file represents years of community patching; Umbra v1 will not match that coverage immediately. This is accepted in exchange for a smaller, more maintainable core and is explicitly called out in Non-Goals.
+- **No crowd-sourced per-site fix file at launch means some long-tail sites will look worse than on Dark Reader on day one.** Dark Reader's 40k-line fix file represents years of community patching; Darkframe v1 will not match that coverage immediately. This is accepted in exchange for a smaller, more maintainable core and is explicitly called out in Non-Goals.
 
 ## 😱 Risks
 
@@ -251,11 +251,11 @@ Internal module boundaries only (no public network API in v1):
 **Deliverable**: `packages/core/dom/` — style discovery, layer-based injector, Shadow-DOM-aware mutation watcher.
 **Tasks**:
 - [x] Implement `style-discovery.ts`: enumerate all `<style>`, `<link rel=stylesheet>`, and `adoptedStyleSheets` in a document, including within shadow roots — AC met (`dom/style-discovery.test.ts`, 6 tests).
-- [x] Implement cross-origin sheet handling via a pluggable `fetchPort` interface (`dom/cross-origin-cache.ts`, backed by the Chrome background script's `umbra:fetch-css` handler) — AC met, and verified in a **real cross-port browser request** in `tests/e2e/verify-extension.mjs`, not just a mock.
-- [x] Implement `layer-injector.ts`: emit one `@layer umbra { ... }` stylesheet per page containing override rules — AC met (`dom/layer-injector.test.ts`). **Correction found during implementation**: plain `@layer` alone loses to the page's own unlayered CSS regardless of specificity (see the Tradeoffs/Key Decisions note added to this RFC's Architecture section) — every declaration is also marked `!important`.
+- [x] Implement cross-origin sheet handling via a pluggable `fetchPort` interface (`dom/cross-origin-cache.ts`, backed by the Chrome background script's `darkframe:fetch-css` handler) — AC met, and verified in a **real cross-port browser request** in `tests/e2e/verify-extension.mjs`, not just a mock.
+- [x] Implement `layer-injector.ts`: emit one `@layer darkframe { ... }` stylesheet per page containing override rules — AC met (`dom/layer-injector.test.ts`). **Correction found during implementation**: plain `@layer` alone loses to the page's own unlayered CSS regardless of specificity (see the Tradeoffs/Key Decisions note added to this RFC's Architecture section) — every declaration is also marked `!important`.
 - [x] Implement the CSSOM-rewrite-in-place fallback path for browsers without `@layer` support — AC met (`theme/apply-theme.test.ts`).
 - [x] Implement `mutation-tree.ts`: Shadow-DOM-aware `MutationObserver` tree with batched re-computation — AC met, plus a real bug found and fixed: `observer.disconnect()` does not cancel a callback the observer already scheduled before disconnecting, so a just-disposed theme instance's stale render could still fire once after a newer instance started (e.g. on a settings-change restart), clobbering correct output with stale values. Fixed with an internal `disposed` guard inside the scheduled callback; regression test added.
-- [x] Implement `applyTheme()`/dispose lifecycle — AC met (`theme/apply-theme.test.ts`, 9 tests) — including a real, serious bug found via live-browser E2E testing (not caught by any unit test): **`computeTheme()` must never read its own previously-recolored output back as if it were fresh page content.** Two distinct instances of this were found and fixed: (1) inline `style=""` attributes are mutated in place, so a naive re-read on the next render recolors an already-recolored value again — not a no-op, since the pole-based remap is a contraction toward a fixed point, not idempotent, which pinned a live tab's CPU in an infinite loop (fixed via `dom/original-value-cache.ts`, caching each declaration's true original on first read); (2) `discoverStylesheets` was finding Umbra's *own* injected `@layer` stylesheet and recursively recoloring the rules inside it, since an `@layer` block has `.cssRules` like any grouping rule (fixed by excluding the managed style element from discovery — see `dom/style-discovery.ts`). Both are covered by dedicated regression tests (`theme-engine.test.ts`, `style-discovery.test.ts`, `mutation-tree.test.ts`).
+- [x] Implement `applyTheme()`/dispose lifecycle — AC met (`theme/apply-theme.test.ts`, 9 tests) — including a real, serious bug found via live-browser E2E testing (not caught by any unit test): **`computeTheme()` must never read its own previously-recolored output back as if it were fresh page content.** Two distinct instances of this were found and fixed: (1) inline `style=""` attributes are mutated in place, so a naive re-read on the next render recolors an already-recolored value again — not a no-op, since the pole-based remap is a contraction toward a fixed point, not idempotent, which pinned a live tab's CPU in an infinite loop (fixed via `dom/original-value-cache.ts`, caching each declaration's true original on first read); (2) `discoverStylesheets` was finding Darkframe's *own* injected `@layer` stylesheet and recursively recoloring the rules inside it, since an `@layer` block has `.cssRules` like any grouping rule (fixed by excluding the managed style element from discovery — see `dom/style-discovery.ts`). Both are covered by dedicated regression tests (`theme-engine.test.ts`, `style-discovery.test.ts`, `mutation-tree.test.ts`).
 **Exit criteria met**: `tests/e2e/verify-extension.mjs` confirms, in a real Chromium instance, zero mutation of original stylesheet rules on the `@layer` path (via the cross-origin/body-rule regression checks) and correct convergent (non-drifting) output across repeated renders.
 
 ### Phase 3: Image & Media Safety Classifier (~6d)
@@ -283,9 +283,9 @@ Internal module boundaries only (no public network API in v1):
 
 ### Phase 5: Safari Web Extension Shell (~6d)
 **Goal**: The same core engine and UI running as a native Safari Web Extension on macOS, functionally at parity with the Chrome build.
-**Deliverable**: `packages/ext-safari/Umbra.xcodeproj` — an Xcode project that builds and runs in Safari on macOS.
+**Deliverable**: `packages/ext-safari/Darkframe.xcodeproj` — an Xcode project that builds and runs in Safari on macOS.
 **Tasks**:
-- [x] Bootstrap via `xcrun safari-web-extension-converter` against the built `packages/ext-chrome` output, then commit the generated Xcode project as the maintained starting point — AC: `xcodebuild -project Umbra.xcodeproj -scheme Umbra build` succeeds locally. **Done**: built with `--swift --macos-only --copy-resources`, confirmed `** BUILD SUCCEEDED **` locally with free ad-hoc ("Sign to Run Locally") signing, and the built `Umbra.app` was launched and confirmed running as a process. **Real bug found and fixed during bootstrap**: the converter set the container app's own `PRODUCT_BUNDLE_IDENTIFIER` to an auto-derived `com.umbra.Umbra` instead of the `--bundle-identifier com.umbra.darkmode` value passed on the command line, while the extension target correctly got `com.umbra.darkmode.Extension` — the mismatch fails Xcode's `ValidateEmbeddedBinary` step ("Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"). Fixed by setting the app target's identifier to `com.umbra.darkmode` directly in `project.pbxproj`. `packages/ext-safari/build.mjs` documents the exact regeneration command; the `Umbra Extension/Resources/*` build outputs are synced from `packages/ext-chrome/dist` by that script rather than hand-maintained separately.
+- [x] Bootstrap via `xcrun safari-web-extension-converter` against the built `packages/ext-chrome` output, then commit the generated Xcode project as the maintained starting point — AC: `xcodebuild -project Darkframe.xcodeproj -scheme Darkframe build` succeeds locally. **Done**: built with `--swift --macos-only --copy-resources`, confirmed `** BUILD SUCCEEDED **` locally with free ad-hoc ("Sign to Run Locally") signing, and the built `Darkframe.app` was launched and confirmed running as a process. **Real bug found and fixed during bootstrap**: the converter set the container app's own `PRODUCT_BUNDLE_IDENTIFIER` to an auto-derived `com.darkframe.Darkframe` instead of the `--bundle-identifier com.darkframe.app` value passed on the command line, while the extension target correctly got `com.darkframe.app.Extension` — the mismatch fails Xcode's `ValidateEmbeddedBinary` step ("Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"). Fixed by setting the app target's identifier to `com.darkframe.app` directly in `project.pbxproj`. `packages/ext-safari/build.mjs` documents the exact regeneration command; the `Darkframe Extension/Resources/*` build outputs are synced from `packages/ext-chrome/dist` by that script rather than hand-maintained separately.
 - [ ] Adapt manifest/background for Safari's WKWebExtension API surface (verify service-worker-equivalent lifecycle behavior; Safari's extension background page lifecycle differs from Chrome's MV3 service worker) — AC: the same force-termination-and-recover test from Phase 4 (adapted for Safari's background lifecycle primitives) passes. **Not yet done** — the converter emitted a warning that manifest.json's `background.type: "module"` key is "not supported by your current version of Safari"; the shared background.js has no unresolved imports so this is likely harmless, but Safari's actual background-page wake/sleep behavior has not yet been verified against the MV3 service-worker assumptions `packages/ext-chrome/src/background/service-worker.ts` makes.
 - [ ] Verify/adapt the `fetchPort` cross-origin implementation and `@layer`/CSSOM-fallback feature detection against Safari's actual WebKit version behavior.
 - [ ] Enable the Safari extension in System Settings and run the full manual regression corpus by hand in real Safari — AC: a documented manual test log shows all 20 corpus fixtures rendering with 0 altered photos, matching the Chrome results. (App builds and launches; the extension has not yet been manually enabled in Safari's Extensions settings and exercised against a live page in this session.)
@@ -300,7 +300,7 @@ Internal module boundaries only (no public network API in v1):
 - [ ] Resolve the Safari distribution Open Question (see below) with an explicit decision, then execute it: either (a) maintainer funds Apple Developer Program ($99/yr) and ships a notarized direct-distribution build, or (b) ship build-from-source only and document that choice publicly — AC: README and repository clearly state which path was chosen and why, with no ambiguity for a prospective user.
 - [ ] Run the full Playwright E2E matrix (Chromium + WebKit engines) as a required, green CI gate on the release tag — AC: `pnpm test:e2e` passes in CI for the tagged release commit.
 - [ ] Write a public privacy policy covering the `host_permissions: *://*/*` grant (required by both Chrome Web Store and Apple review) — AC: a `PRIVACY.md` exists, is linked from both store listings, and explicitly states no telemetry/analytics are collected (true per this RFC's Non-Goals).
-**Exit criteria**: A first-time user can install Umbra from a public listing (Chrome Web Store, and whichever Safari path was chosen) without contacting the maintainer, on a machine that has never had the extension before.
+**Exit criteria**: A first-time user can install Darkframe from a public listing (Chrome Web Store, and whichever Safari path was chosen) without contacting the maintainer, on a machine that has never had the extension before.
 
 ## 🔒 Security Hardening (post-v1 audit)
 
@@ -315,7 +315,7 @@ would have flagged in the original implementation:
   before embedding an `<img src>` value into a generated `img[src="..."]` selector. Per the
   CSS syntax spec, an unescaped literal newline/CR/form-feed inside a quoted string
   terminates the string token early; everything after it is re-tokenized as fresh CSS —
-  including inside Umbra's own `!important`-marked `@layer` stylesheet, which is
+  including inside Darkframe's own `!important`-marked `@layer` stylesheet, which is
   specifically designed to win the cascade. A page that lets users embed raw `<img>` tags
   (a common "safe HTML subset" in forums/wikis/chat apps) with a crafted `src` containing an
   embedded control character followed by attacker CSS could inject arbitrary, fully valid
@@ -330,7 +330,7 @@ would have flagged in the original implementation:
   would be the attacker's injected rule). Verified this test actually fails against the
   pre-fix implementation before confirming the fix, not just that it passes after.
 - **Unrestricted, SSRF-shaped background fetch for cross-origin CSS (Medium severity).** The
-  background script's `umbra:fetch-css` handler (backed by `dom/cross-origin-cache.ts`)
+  background script's `darkframe:fetch-css` handler (backed by `dom/cross-origin-cache.ts`)
   fetched any URL a page's own `<link rel=stylesheet href>` pointed at, with zero
   protocol/host validation, using the extension's broad `host_permissions` — which grants a
   CORS bypass ordinary page script does not have. Any visited page could embed a hidden
@@ -378,7 +378,7 @@ this section being written.
 - [ ] **Safari distribution funding decision**: does the project commit to an ongoing $99/year personal Apple Developer Program cost to ship a signed/notarized direct-distribution build for non-technical users, or does v1 ship build-from-source-only on Safari and revisit funded distribution later? — owner: you, target resolution: before Phase 6 starts.
 - [ ] **Contrast standard**: standardize v1's `contrast-solver.ts` on WCAG 2.1 relative-luminance contrast ratio (safe, widely referenced, easier to test deterministically) with APCA as a possible opt-in enhancement later, or build on APCA from the start (more perceptually accurate but not yet a ratified standard)? Recommendation in this RFC is WCAG 2.1 for v1 — needs explicit confirmation. — owner: you, target resolution: before Phase 1 starts.
 - [ ] **iOS Safari timeline**: is iOS/iPadOS support desired at all, and if so, is it acceptable that it requires full App Store review (no side-loading option exists on iOS, unlike macOS)? Recommendation is macOS-first, iOS deferred to Follow-up Work. — owner: you, target resolution: before Phase 5 starts (does not block Phase 0–4).
-- [ ] **Project name/branding**: "Umbra" was chosen as a working name (short, thematically apt, no obvious collision with existing folders in `~/Documents/Personal`) but has not been checked against existing Chrome Web Store or npm package name collisions. — owner: you, target resolution: before Phase 6 (Chrome Web Store submission).
+- [ ] **Project name/branding**: "Darkframe" was chosen as a working name (short, thematically apt, no obvious collision with existing folders in `~/Documents/Personal`) but has not been checked against existing Chrome Web Store or npm package name collisions. — owner: you, target resolution: before Phase 6 (Chrome Web Store submission).
 
 ## 🔜 Follow-up Work (Deferred, Not Silently Dropped)
 
@@ -417,4 +417,4 @@ Explicitly deferred past v1, to prevent the scope creep identified as a Priority
 
 ### Appendix C: Naming
 
-"Umbra" (Latin: shadow) was selected as a working project name for its thematic fit and because it does not collide with any existing folder in `~/Documents/Personal`. Not yet checked against Chrome Web Store or npm registry collisions (see Open Questions).
+"Darkframe" (Latin: shadow) was selected as a working project name for its thematic fit and because it does not collide with any existing folder in `~/Documents/Personal`. Not yet checked against Chrome Web Store or npm registry collisions (see Open Questions).

@@ -23,7 +23,7 @@ async function render() {
     return;
   }
 
-  const state = (await chrome.runtime.sendMessage({ type: "umbra:get-state", origin })) as GetStateResponse;
+  const state = (await chrome.runtime.sendMessage({ type: "darkframe:get-state", origin })) as GetStateResponse;
   const effectivelyEnabled =
     state.siteOverride === "force-on" || (state.siteOverride === "default" && state.globallyEnabled);
 
@@ -33,7 +33,7 @@ async function render() {
 
   siteButton.onclick = async () => {
     await chrome.runtime.sendMessage({
-      type: "umbra:set-enabled",
+      type: "darkframe:set-enabled",
       origin,
       enabled: !effectivelyEnabled,
       scope: "site",
@@ -43,7 +43,7 @@ async function render() {
 
   globalButton.onclick = async () => {
     await chrome.runtime.sendMessage({
-      type: "umbra:set-enabled",
+      type: "darkframe:set-enabled",
       origin,
       enabled: !state.globallyEnabled,
       scope: "global",

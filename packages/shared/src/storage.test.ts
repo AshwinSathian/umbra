@@ -3,7 +3,7 @@ import { GLOBAL_ENABLED_KEY, resolveEnabled, siteOverrideKey } from "./storage.j
 
 describe("siteOverrideKey", () => {
   it("namespaces the key by origin", () => {
-    expect(siteOverrideKey("https://example.com")).toBe("umbra:site:https://example.com");
+    expect(siteOverrideKey("https://example.com")).toBe("darkframe:site:https://example.com");
   });
 
   it("produces distinct keys for distinct origins", () => {
@@ -33,6 +33,6 @@ describe("resolveEnabled", () => {
 
 describe("GLOBAL_ENABLED_KEY", () => {
   it("is a stable, namespaced storage key", () => {
-    expect(GLOBAL_ENABLED_KEY).toBe("umbra:enabledGlobally");
+    expect(GLOBAL_ENABLED_KEY).toBe("darkframe:enabledGlobally");
   });
 });

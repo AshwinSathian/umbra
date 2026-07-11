@@ -3,21 +3,21 @@
 // same shape so packages/core never needs to branch on platform.
 
 export type FetchCssRequest = {
-  type: "umbra:fetch-css";
+  type: "darkframe:fetch-css";
   url: string;
 };
 
 export type FetchCssResponse = {
-  type: "umbra:fetch-css-result";
+  type: "darkframe:fetch-css-result";
   url: string;
   cssText: string | null;
   error: string | null;
 };
 
 export type ToggleRequest = {
-  type: "umbra:toggle";
+  type: "darkframe:toggle";
   origin: string;
   enabled: boolean;
 };
 
-export type UmbraMessage = FetchCssRequest | FetchCssResponse | ToggleRequest;
+export type DarkframeMessage = FetchCssRequest | FetchCssResponse | ToggleRequest;

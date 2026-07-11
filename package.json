@@ -1,5 +1,5 @@
 {
-  "name": "umbra",
+  "name": "darkframe",
   "private": true,
   "version": "0.1.0",
   "description": "A free, cross-browser, image-safe dark mode engine for Chrome and Safari.",
@@ -32,7 +32,7 @@
     "build": "pnpm -r run build",
     "lint": "eslint .",
     "format": "prettier --check .",
-    "typecheck": "pnpm --filter @umbra/core --filter @umbra/shared --filter @umbra/ui --filter @umbra/ext-chrome exec tsc --noEmit",
+    "typecheck": "pnpm --filter @darkframe/core --filter @darkframe/shared --filter @darkframe/ui --filter @darkframe/ext-chrome exec tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:corpus": "vitest run tests/corpus"

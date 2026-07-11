@@ -17,7 +17,7 @@ const MAX_ANALYSIS_DIMENSION = 32;
  * available in both Chrome and Safari content-script contexts; it is
  * intentionally not unit-tested here since Vitest's happy-dom environment
  * has no real image decoder or canvas pixel backend — it's exercised by
- * the Playwright end-to-end suite instead (Phase 7 of PLAN-umbra.md).
+ * the Playwright end-to-end suite instead (Phase 7 of PLAN-darkframe.md).
  */
 export const sampleImageFromUrl: ImageSampler = async (url: string): Promise<PixelGrid | null> => {
   try {

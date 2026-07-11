@@ -1,8 +1,8 @@
 {
-  "name": "@umbra/core",
+  "name": "@darkframe/core",
   "private": true,
   "version": "0.1.0",
-  "description": "Umbra's platform-agnostic color/DOM/image engine — OKLCH recoloring, non-destructive CSS injection, and image/media safety classification.",
+  "description": "Darkframe's platform-agnostic color/DOM/image engine — OKLCH recoloring, non-destructive CSS injection, and image/media safety classification.",
   "license": "MIT",
   "author": "Ashwin Sathian",
   "repository": {

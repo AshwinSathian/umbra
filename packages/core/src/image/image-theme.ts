@@ -46,7 +46,7 @@ const CONTROL_CHAR_PATTERN = new RegExp("[" + "\\u0000-\\u001f\\u007f" + "]", "g
  * character (newline, carriage return, form feed) inside a quoted string
  * terminates the string token early, and everything after it is
  * re-tokenized as fresh CSS — including, in this codebase's case, inside
- * Umbra's own `!important`-marked `@layer` stylesheet (see
+ * Darkframe's own `!important`-marked `@layer` stylesheet (see
  * dom/layer-injector.ts), which is specifically designed to win the
  * cascade. An `<img src>` containing an embedded control character (e.g.
  * a raw newline byte in attacker-supplied page HTML, followed by

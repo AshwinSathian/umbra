@@ -1,8 +1,8 @@
-# Umbra
+# Darkframe
 
 [![CI](https://github.com/AshwinSathian/umbra/actions/workflows/ci.yml/badge.svg)](https://github.com/AshwinSathian/umbra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](./PLAN-umbra.md)
+[![Tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](./PLAN-darkframe.md)
 
 A free, open-source, cross-browser dark-mode engine for Chrome and Safari — built as a
 constructive overhaul of Dark Reader's approach, with three explicit goals:
@@ -15,7 +15,7 @@ constructive overhaul of Dark Reader's approach, with three explicit goals:
    CSSOM-direct-rewrite fallback for engines without Cascade Layer support).
 3. **Fully free, on every platform, including Safari.** No paid tier, no purchase, ever.
 
-See [PLAN-umbra.md](./PLAN-umbra.md) for the full architecture, phased build plan, risks,
+See [PLAN-darkframe.md](./PLAN-darkframe.md) for the full architecture, phased build plan, risks,
 and open questions.
 
 ## Status
@@ -26,11 +26,11 @@ Phases 0–5 of the plan are built: the core color/DOM/image engine (`packages/c
 `tests/e2e/verify-extension.mjs`), and a real, buildable macOS Safari Web Extension Xcode
 project (`packages/ext-safari`, generated via Apple's `safari-web-extension-converter` and
 confirmed to build and launch locally with free ad-hoc code signing). Not yet published to
-the Chrome Web Store or notarized for non-technical Safari users — see PLAN-umbra.md Phase 6
+the Chrome Web Store or notarized for non-technical Safari users — see PLAN-darkframe.md Phase 6
 and its Open Questions.
 
 The project has also been through a dedicated adversarial security audit and an independent
-architecture/quality audit — see PLAN-umbra.md's "Security Hardening" section for the two
+architecture/quality audit — see PLAN-darkframe.md's "Security Hardening" section for the two
 real vulnerabilities found and fixed, and the "Follow-up Work" / Data Flow sections for the
 quality findings addressed.
 
@@ -47,7 +47,7 @@ pnpm typecheck
 ## Running the Chrome extension locally
 
 ```sh
-pnpm --filter @umbra/ext-chrome build
+pnpm --filter @darkframe/ext-chrome build
 ```
 
 Then in Chrome: go to `chrome://extensions`, enable Developer Mode, click "Load unpacked",
@@ -68,18 +68,18 @@ Store submission or paid Apple Developer Program membership is needed just to bu
 it yourself.
 
 ```sh
-pnpm --filter @umbra/ext-safari build          # syncs the built web-extension into the Xcode project
-open packages/ext-safari/Umbra/Umbra.xcodeproj
+pnpm --filter @darkframe/ext-safari build          # syncs the built web-extension into the Xcode project
+open packages/ext-safari/Darkframe/Darkframe.xcodeproj
 ```
 
-Then in Xcode, select the "Umbra" scheme and Run. The first time, enable the extension in
+Then in Xcode, select the "Darkframe" scheme and Run. The first time, enable the extension in
 **Safari > Settings > Extensions** (you may also need **System Settings > Privacy &
 Security > Extensions** and, on some macOS versions, enabling "Allow unsigned extensions"
 via `safari.developer` menu / `defaults write` for local development builds).
 
 A signed, notarized build that a non-technical user could install with one click (rather
 than building from source) requires an Apple Developer Program membership ($99/year) — see
-the "Safari distribution funding decision" open question in PLAN-umbra.md. The extension
+the "Safari distribution funding decision" open question in PLAN-darkframe.md. The extension
 itself has no purchase price either way.
 
 ## Contributing

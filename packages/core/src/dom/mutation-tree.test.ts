@@ -30,15 +30,15 @@ describe("observeMutations", () => {
     dispose();
   });
 
-  it("ignores mutations that are solely Umbra's own managed style element", async () => {
+  it("ignores mutations that are solely Darkframe's own managed style element", async () => {
     const onChange = vi.fn();
     const dispose = observeMutations(document, onChange);
 
     const managed = document.createElement("style");
     managed.id = MANAGED_STYLE_ID;
-    managed.setAttribute("data-umbra-managed", "true");
+    managed.setAttribute("data-darkframe-managed", "true");
     document.head.appendChild(managed);
-    managed.textContent = "@layer umbra { a { color: red !important; } }";
+    managed.textContent = "@layer darkframe { a { color: red !important; } }";
 
     await flushMicrotasks();
     expect(onChange).not.toHaveBeenCalled();

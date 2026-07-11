@@ -1,8 +1,8 @@
 {
-  "name": "@umbra/ext-chrome",
+  "name": "@darkframe/ext-chrome",
   "private": true,
   "version": "0.1.0",
-  "description": "Umbra's Chrome MV3 extension shell — background service worker, content script, popup, and options page.",
+  "description": "Darkframe's Chrome MV3 extension shell — background service worker, content script, popup, and options page.",
   "license": "MIT",
   "author": "Ashwin Sathian",
   "repository": {
@@ -18,8 +18,8 @@
     "build": "node build.mjs"
   },
   "dependencies": {
-    "@umbra/core": "workspace:*",
-    "@umbra/shared": "workspace:*",
-    "@umbra/ui": "workspace:*"
+    "@darkframe/core": "workspace:*",
+    "@darkframe/shared": "workspace:*",
+    "@darkframe/ui": "workspace:*"
   }
 }

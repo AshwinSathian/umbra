@@ -5,8 +5,8 @@ export type DisposeFn = () => void;
 
 /**
  * Returns true if every mutation record in this batch is solely about
- * Umbra's own managed style element(s) — i.e. this callback fired only
- * because Umbra itself just wrote a theme, not because the page changed.
+ * Darkframe's own managed style element(s) — i.e. this callback fired only
+ * because Darkframe itself just wrote a theme, not because the page changed.
  * Without this guard, applying a theme would re-trigger the very observer
  * watching for page changes, causing an infinite recompute loop.
  */

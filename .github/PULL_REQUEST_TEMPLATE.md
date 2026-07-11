@@ -13,6 +13,6 @@
 
 ## Checklist
 
-- [ ] Updated [PLAN-umbra.md](../PLAN-umbra.md) if this changes documented architecture, adds/
+- [ ] Updated [PLAN-darkframe.md](../PLAN-darkframe.md) if this changes documented architecture, adds/
       removes a phase task, or fixes a bug worth recording
 - [ ] Updated [CHANGELOG.md](../CHANGELOG.md)

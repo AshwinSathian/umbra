@@ -1,4 +1,4 @@
-export const THEME_SETTINGS_KEY = "umbra:themeSettings";
+export const THEME_SETTINGS_KEY = "darkframe:themeSettings";
 
 export type StoredThemeSettings = {
   /** OKLCH lightness (0-1) most backgrounds settle near. */

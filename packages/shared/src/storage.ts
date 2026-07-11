@@ -1,7 +1,7 @@
-export const GLOBAL_ENABLED_KEY = "umbra:enabledGlobally";
+export const GLOBAL_ENABLED_KEY = "darkframe:enabledGlobally";
 
 export function siteOverrideKey(origin: string): string {
-  return `umbra:site:${origin}`;
+  return `darkframe:site:${origin}`;
 }
 
 export type SiteOverride = "force-on" | "force-off" | "default";

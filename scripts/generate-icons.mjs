@@ -1,4 +1,4 @@
-// Generates Umbra's extension icons (a crescent-moon "shadow" mark) at every
+// Generates Darkframe's extension icons (a crescent-moon "shadow" mark) at every
 // size Chrome/Safari need, using a real browser canvas via Playwright rather
 // than a design tool — self-contained, no binary assets checked in as
 // "source", regenerable any time from this script.
@@ -11,11 +11,11 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 const chromeIconsDir = path.join(dir, "../packages/ext-chrome/icons");
 const appIconSetDir = path.join(
   dir,
-  "../packages/ext-safari/Umbra/Umbra/Assets.xcassets/AppIcon.appiconset",
+  "../packages/ext-safari/Darkframe/Darkframe/Assets.xcassets/AppIcon.appiconset",
 );
 const largeIconSetDir = path.join(
   dir,
-  "../packages/ext-safari/Umbra/Umbra/Assets.xcassets/LargeIcon.imageset",
+  "../packages/ext-safari/Darkframe/Darkframe/Assets.xcassets/LargeIcon.imageset",
 );
 mkdirSync(chromeIconsDir, { recursive: true });
 mkdirSync(appIconSetDir, { recursive: true });
@@ -49,7 +49,7 @@ function paintIcon(ctx, size) {
 
   // Crescent: a bright solid disc with a second, offset dark disc cut out
   // of it (classic crescent-moon construction) — the "shadow" motif the
-  // name Umbra (Latin: shadow) refers to. Sized generously and kept a
+  // name Darkframe (Latin: shadow) refers to. Sized generously and kept a
   // single flat bright color so it stays legible down to 16px.
   ctx.fillStyle = "#a78bfa";
   ctx.beginPath();

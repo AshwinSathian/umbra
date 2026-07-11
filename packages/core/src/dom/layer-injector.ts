@@ -1,12 +1,12 @@
 export type PropertyOverride = { property: string; value: string };
 export type SelectorOverride = { selectorText: string; properties: PropertyOverride[] };
 
-export const MANAGED_STYLE_ID = "umbra-theme-layer";
-export const MANAGED_STYLE_MARKER_ATTR = "data-umbra-managed";
-const LAYER_NAME = "umbra";
+export const MANAGED_STYLE_ID = "darkframe-theme-layer";
+export const MANAGED_STYLE_MARKER_ATTR = "data-darkframe-managed";
+const LAYER_NAME = "darkframe";
 
 /**
- * Generates the CSS text for a single additive `@layer umbra { ... }`
+ * Generates the CSS text for a single additive `@layer darkframe { ... }`
  * stylesheet from a set of per-selector property overrides.
  *
  * Every declaration is marked `!important`. This is required, not

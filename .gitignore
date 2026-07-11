@@ -11,12 +11,12 @@ DerivedData/
 *.xcarchive
 
 # Synced from packages/ext-chrome/dist by packages/ext-safari/build.mjs — build
-# output, not source; regenerate with `pnpm --filter @umbra/ext-safari build`.
-packages/ext-safari/Umbra/Umbra Extension/Resources/*.js
-packages/ext-safari/Umbra/Umbra Extension/Resources/*.js.map
-packages/ext-safari/Umbra/Umbra Extension/Resources/*.html
-packages/ext-safari/Umbra/Umbra Extension/Resources/manifest.json
-packages/ext-safari/Umbra/Umbra Extension/Resources/icons/
+# output, not source; regenerate with `pnpm --filter @darkframe/ext-safari build`.
+packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.js
+packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.js.map
+packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.html
+packages/ext-safari/Darkframe/Darkframe Extension/Resources/manifest.json
+packages/ext-safari/Darkframe/Darkframe Extension/Resources/icons/
 
 # E2E script output
 tests/e2e/verify-report.json

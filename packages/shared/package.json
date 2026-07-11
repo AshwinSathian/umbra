@@ -1,8 +1,8 @@
 {
-  "name": "@umbra/shared",
+  "name": "@darkframe/shared",
   "private": true,
   "version": "0.1.0",
-  "description": "Typed messages, storage keys, settings schema, and URL-safety validation shared by Umbra's Chrome and Safari extension shells.",
+  "description": "Typed messages, storage keys, settings schema, and URL-safety validation shared by Darkframe's Chrome and Safari extension shells.",
   "license": "MIT",
   "author": "Ashwin Sathian",
   "repository": {

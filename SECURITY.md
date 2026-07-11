@@ -1,6 +1,6 @@
 # Security Policy
 
-Umbra runs with broad host permissions (`http://*/*`, `https://*/*`) by necessity — recoloring
+Darkframe runs with broad host permissions (`http://*/*`, `https://*/*`) by necessity — recoloring
 arbitrary pages requires reading their stylesheets, DOM, and images. That makes this
 extension a meaningful place to report security issues responsibly.
 

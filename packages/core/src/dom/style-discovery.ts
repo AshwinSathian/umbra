@@ -59,7 +59,7 @@ function canReadCssRules(sheet: CSSStyleSheet): boolean {
  * shadow roots, so this cannot double-count a nested root's sheets — those
  * are already enumerated separately via `getAllStyleRoots`.
  *
- * Explicitly skips Umbra's own managed style element (marked with
+ * Explicitly skips Darkframe's own managed style element (marked with
  * MANAGED_STYLE_MARKER_ATTR). Without this exclusion, a later discovery
  * pass would find our own injected @layer stylesheet, walk into its rules
  * (an @layer block has .cssRules like any other grouping rule — see

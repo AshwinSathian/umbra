@@ -14,7 +14,7 @@ describe("buildLayerStylesheetText", () => {
       { selectorText: ".card", properties: [{ property: "color", value: "rgb(240, 240, 240)" }] },
     ]);
 
-    expect(css).toMatch(/^@layer umbra \{/);
+    expect(css).toMatch(/^@layer darkframe \{/);
     expect(css).toContain("background-color: rgb(10, 10, 10) !important;");
     expect(css).toContain("color: rgb(240, 240, 240) !important;");
   });

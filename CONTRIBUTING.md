@@ -1,4 +1,4 @@
-# Contributing to Umbra
+# Contributing to Darkframe
 
 Thanks for considering contributing. This is a small, solo-maintained project, so please
 keep pull requests focused — small, reviewable changes get merged much faster than large
@@ -27,7 +27,7 @@ To run the Safari extension locally, see [README.md](./README.md#running-the-saf
   `node tests/e2e/verify-extension.mjs` locally (requires a real display — it loads the
   actual built extension into a real Chromium instance via Playwright) and paste its output
   into the PR description.
-- Update [PLAN-umbra.md](./PLAN-umbra.md) if your change affects the documented architecture,
+- Update [PLAN-darkframe.md](./PLAN-darkframe.md) if your change affects the documented architecture,
   adds/removes a phase task, or fixes a bug worth recording for posterity — this file is the
   project's running design log, not just an initial planning doc.
 

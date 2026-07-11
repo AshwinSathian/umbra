@@ -1,18 +1,18 @@
-import type { FetchCssRequest } from "@umbra/shared";
-import { GLOBAL_ENABLED_KEY, isFetchableCssUrl, siteOverrideKey } from "@umbra/shared";
+import type { FetchCssRequest } from "@darkframe/shared";
+import { GLOBAL_ENABLED_KEY, isFetchableCssUrl, siteOverrideKey } from "@darkframe/shared";
 
 type SetEnabledMessage = {
-  type: "umbra:set-enabled";
+  type: "darkframe:set-enabled";
   origin: string;
   enabled: boolean;
   scope: "site" | "global";
 };
 
-type GetStateMessage = { type: "umbra:get-state"; origin: string };
+type GetStateMessage = { type: "darkframe:get-state"; origin: string };
 
 chrome.runtime.onMessage.addListener(
   (message: SetEnabledMessage | GetStateMessage | FetchCssRequest, _sender, sendResponse) => {
-    if (message.type === "umbra:fetch-css") {
+    if (message.type === "darkframe:fetch-css") {
       // Fetched from the background script, not the content script: a
       // page's own Content-Security-Policy can block a content script's
       // fetch of a third-party stylesheet URL, but the extension's own
@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
-    if (message.type === "umbra:get-state") {
+    if (message.type === "darkframe:get-state") {
       void chrome.storage.local
         .get([GLOBAL_ENABLED_KEY, siteOverrideKey(message.origin)])
         .then((stored) => {
@@ -49,7 +49,7 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
-    if (message.type === "umbra:set-enabled") {
+    if (message.type === "darkframe:set-enabled") {
       const update =
         message.scope === "global"
           ? { [GLOBAL_ENABLED_KEY]: message.enabled }
@@ -60,7 +60,7 @@ chrome.runtime.onMessage.addListener(
         for (const tab of tabs) {
           if (tab.id === undefined) continue;
           chrome.tabs
-            .sendMessage(tab.id, { type: "umbra:toggle", origin: message.origin, enabled: message.enabled })
+            .sendMessage(tab.id, { type: "darkframe:toggle", origin: message.origin, enabled: message.enabled })
             .catch(() => {
               // No content script listening in this tab (e.g. a chrome:// page) — expected, not an error.
             });
