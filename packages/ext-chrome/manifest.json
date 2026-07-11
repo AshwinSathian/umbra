@@ -32,6 +32,6 @@
       "all_frames": true
     }
   ],
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage"],
   "host_permissions": ["http://*/*", "https://*/*"]
 }
