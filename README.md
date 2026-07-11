@@ -25,9 +25,14 @@ Phases 0–5 of the plan are built: the core color/DOM/image engine (`packages/c
 (`packages/ext-chrome`, verified end-to-end against a real Chromium instance — see
 `tests/e2e/verify-extension.mjs`), and a real, buildable macOS Safari Web Extension Xcode
 project (`packages/ext-safari`, generated via Apple's `safari-web-extension-converter` and
-confirmed to build and launch locally with free ad-hoc code signing). Not yet published to
-the Chrome Web Store or notarized for non-technical Safari users — see PLAN-darkframe.md Phase 6
-and its Open Questions.
+confirmed to build and launch locally with free ad-hoc code signing).
+
+Both store listings are fully prepared — packaged build, screenshots, promo art, and every
+required piece of listing/privacy copy — but not yet submitted: the Chrome Web Store
+submission just needs a developer-account action, and the Safari/Mac App Store submission is
+blocked on Apple Developer Program identity verification currently in progress. See
+[RELEASING.md](./RELEASING.md) for the full step-by-step path and [`store/`](./store) for the
+prepared listing copy and generated assets for both platforms.
 
 The project has also been through a dedicated adversarial security audit and an independent
 architecture/quality audit — see PLAN-darkframe.md's "Security Hardening" section for the two
@@ -78,9 +83,10 @@ Security > Extensions** and, on some macOS versions, enabling "Allow unsigned ex
 via `safari.developer` menu / `defaults write` for local development builds).
 
 A signed, notarized build that a non-technical user could install with one click (rather
-than building from source) requires an Apple Developer Program membership ($99/year) — see
-the "Safari distribution funding decision" open question in PLAN-darkframe.md. The extension
-itself has no purchase price either way.
+than building from source) requires an Apple Developer Program membership ($99/year) — the
+project has committed to this and enrollment is in progress (pending Apple's identity
+verification); see [RELEASING.md](./RELEASING.md) for the Mac App Store submission path once
+that clears. The extension itself has no purchase price either way.
 
 ## Contributing
 
@@ -95,6 +101,12 @@ for it.
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md).
+
+## Releasing
+
+See [RELEASING.md](./RELEASING.md) for the full Chrome Web Store and Mac App Store
+submission process, and [`store/`](./store) for prepared listing copy and generated store
+assets for both platforms.
 
 ## License
 
