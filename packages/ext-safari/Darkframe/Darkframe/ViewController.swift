@@ -1,15 +1,15 @@
 //
 //  ViewController.swift
-//  Umbra
+//  Darkframe
 //
-//  Created by Ashwin Sathian on 06/07/26.
+//  Created by Ashwin Sathian on 11/07/26.
 //
 
 import Cocoa
 import SafariServices
 import WebKit
 
-let extensionBundleIdentifier = "com.umbra.darkmode.Extension"
+let extensionBundleIdentifier = "com.darkframe.app.Extension"
 
 class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHandler {
 

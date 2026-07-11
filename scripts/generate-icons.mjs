@@ -48,8 +48,8 @@ function paintIcon(ctx, size) {
   ctx.fill();
 
   // Crescent: a bright solid disc with a second, offset dark disc cut out
-  // of it (classic crescent-moon construction) — the "shadow" motif the
-  // name Darkframe (Latin: shadow) refers to. Sized generously and kept a
+  // of it (classic crescent-moon construction) — a shadow/dark-mode motif,
+  // independent of the exact product name. Sized generously and kept a
   // single flat bright color so it stays legible down to 16px.
   ctx.fillStyle = "#a78bfa";
   ctx.beginPath();

@@ -1,8 +1,8 @@
 //
 //  SafariWebExtensionHandler.swift
-//  Umbra Extension
+//  Darkframe Extension
 //
-//  Created by Ashwin Sathian on 06/07/26.
+//  Created by Ashwin Sathian on 11/07/26.
 //
 
 import SafariServices

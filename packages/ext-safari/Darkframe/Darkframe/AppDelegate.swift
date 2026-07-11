@@ -1,8 +1,8 @@
 //
 //  AppDelegate.swift
-//  Umbra
+//  Darkframe
 //
-//  Created by Ashwin Sathian on 06/07/26.
+//  Created by Ashwin Sathian on 11/07/26.
 //
 
 import Cocoa
