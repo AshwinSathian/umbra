@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AshwinSathian/umbra/actions/workflows/ci.yml/badge.svg)](https://github.com/AshwinSathian/umbra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](./PLAN-darkframe.md)
+[![Tests](https://img.shields.io/badge/tests-128%20passing-brightgreen)](./PLAN-darkframe.md)
 
 A free, open-source, cross-browser dark-mode engine for Chrome and Safari — built as a
 constructive overhaul of Dark Reader's approach, with three explicit goals:
@@ -21,7 +21,7 @@ and open questions.
 ## Status
 
 Phases 0–5 of the plan are built: the core color/DOM/image engine (`packages/core` +
-`packages/shared`, 119 passing unit tests), a working Chrome MV3 extension
+`packages/shared`, 128 passing unit tests), a working Chrome MV3 extension
 (`packages/ext-chrome`, verified end-to-end against a real Chromium instance — see
 `tests/e2e/verify-extension.mjs`), and a real, buildable macOS Safari Web Extension Xcode
 project (`packages/ext-safari`, generated via Apple's `safari-web-extension-converter` and

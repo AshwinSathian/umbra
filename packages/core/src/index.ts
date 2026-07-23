@@ -13,6 +13,7 @@ export * from "./site-detect/native-dark.js";
 export * from "./dom/style-discovery.js";
 export * from "./dom/layer-injector.js";
 export * from "./dom/mutation-tree.js";
+export * from "./dom/stylesheet-mutation-watch.js";
 export * from "./dom/cross-origin-cache.js";
 export * from "./dom/inline-style-scan.js";
 export * from "./dom/inline-rewrite-tracker.js";

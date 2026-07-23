@@ -9,7 +9,7 @@ ones.
 ```sh
 pnpm install
 pnpm build       # builds all packages, including syncing the Safari resources
-pnpm test        # 119+ unit tests across packages/core and packages/shared
+pnpm test        # 128+ unit tests across packages/core and packages/shared
 pnpm lint
 pnpm typecheck
 ```

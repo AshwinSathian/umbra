@@ -135,6 +135,59 @@ describe("computeTheme", () => {
     expect(secondValue).toBe(firstValue);
   });
 
+  it("resolves a CSS custom property (var()) reference via the matched element's computed style", () => {
+    // Reproduces the exact, confirmed cause of MongoDB Atlas's cluster
+    // cards staying white under Darkframe: its leafygreen-ui design system
+    // emits `background-color: var(--mdb-white)` via an Emotion-injected
+    // <style> tag. parseCssColor cannot resolve `var()` itself (it has no
+    // DOM to resolve a custom property against — see parse.ts), so this
+    // must be resolved before reaching it, via the matched element's real
+    // computed style. The custom property is declared on the same rule
+    // that uses it (rather than on `:root`, as MongoDB's actual case does)
+    // because happy-dom, confirmed experimentally, does not inherit a
+    // custom property's computed value down to descendant elements via
+    // `getPropertyValue` — real browsers do; this only works around a
+    // test-environment gap, exercising the identical resolution code path.
+    const style = document.createElement("style");
+    style.textContent = ".css-1y5u6ib { --card-bg: #ffffff; background-color: var(--card-bg); }";
+    document.head.appendChild(style);
+    const card = document.createElement("div");
+    card.className = "css-1y5u6ib";
+    document.body.appendChild(card);
+
+    const result = computeTheme(document);
+    const rewrite = result.directRewrites.find((r) => r.property === "background-color");
+    expect(rewrite).toBeDefined();
+    const recolored = parseCssColor(rewrite!.value)!;
+    expect(recolored.r).toBeLessThan(0.3);
+    expect(recolored.g).toBeLessThan(0.3);
+    expect(recolored.b).toBeLessThan(0.3);
+  });
+
+  it("leaves a var()-backed declaration untouched (not crashing) when no element currently matches the selector", () => {
+    const style = document.createElement("style");
+    style.textContent = ":root { --card-bg: #ffffff; } .not-on-page { background-color: var(--card-bg); }";
+    document.head.appendChild(style);
+
+    expect(() => computeTheme(document)).not.toThrow();
+    const result = computeTheme(document);
+    expect(result.directRewrites.some((r) => r.property === "background-color")).toBe(false);
+  });
+
+  it("resolves a var()-backed inline style directly via the element's own computed style", () => {
+    const el = document.createElement("div");
+    // Custom property and its use both on the same element's inline style —
+    // see the comment above for why (happy-dom inheritance gap).
+    el.setAttribute("style", "--inline-bg: #ffffff; background-color: var(--inline-bg);");
+    document.body.appendChild(el);
+
+    const result = computeTheme(document);
+    const rewrite = result.inlineRewrites.find((r) => r.property === "background-color");
+    expect(rewrite).toBeDefined();
+    const recolored = parseCssColor(rewrite!.value)!;
+    expect(recolored.r).toBeLessThan(0.3);
+  });
+
   it("preserves the original alpha channel of a semi-transparent color", () => {
     const style = document.createElement("style");
     style.textContent = "div { background-color: rgba(255, 255, 255, 0.5); }";

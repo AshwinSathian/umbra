@@ -74,6 +74,7 @@ describe("applyTheme (@layer path, forced on to verify the additive/non-mutating
   beforeEach(() => {
     document.head.innerHTML = "";
     document.body.innerHTML = "";
+    document.adoptedStyleSheets = [];
   });
 
   it("injects exactly one managed stylesheet and never mutates the original rule", () => {
@@ -121,6 +122,43 @@ describe("applyTheme (@layer path, forced on to verify the additive/non-mutating
     expect(document.getElementById(MANAGED_STYLE_ID)?.textContent).toContain('img[src="https://example.com/icon.png"]');
     expect(document.getElementById(MANAGED_STYLE_ID)?.textContent).toContain("invert(1) hue-rotate(180deg)");
 
+    dispose();
+  });
+
+  it("themes a class already present at initial render whose defining rule is inserted later via insertRule() (CSS-in-JS 'speedy' mode), with no other DOM mutation", async () => {
+    // Reproduces the confirmed root cause of MongoDB Atlas's cluster cards
+    // staying white under Darkframe: leafygreen-ui/Emotion's production
+    // "speedy" mode defines a class's rule via CSSStyleSheet.insertRule()
+    // rather than a DOM-visible <style> textContent write — invisible to
+    // the plain MutationObserver in dom/mutation-tree.ts. The element's
+    // class is already present from the very first render (as it would be
+    // for element structure that mounts before its styles finish
+    // computing), and — critically — nothing else on the page mutates
+    // afterward, isolating this from the (real, but not always available)
+    // incidental rescue via the image-scan/cross-origin-warm completion.
+    //
+    // Uses a constructible `new CSSStyleSheet()` adopted via
+    // `document.adoptedStyleSheets` rather than a `<style>` element's
+    // `.sheet` — see the comment at the top of
+    // dom/stylesheet-mutation-watch.test.ts for why (a happy-dom-only
+    // fidelity gap; real browsers don't have this split, and Emotion's
+    // speedy mode itself uses a `<style>` element's sheet, which this
+    // therefore stands in for faithfully as far as the mechanism under
+    // test — insertRule() interception — is concerned).
+    const sheet = new window.CSSStyleSheet();
+    document.adoptedStyleSheets = [sheet];
+    const card = document.createElement("div");
+    card.className = "css-speedy";
+    document.body.appendChild(card);
+
+    const dispose = applyTheme(document, window, { forceLayerSupport: true });
+    await tick();
+    expect(document.getElementById(MANAGED_STYLE_ID)?.textContent ?? "").not.toContain(".css-speedy");
+
+    sheet.insertRule(".css-speedy { background-color: #ffffff; }", 0);
+    await tick();
+
+    expect(document.getElementById(MANAGED_STYLE_ID)?.textContent).toContain(".css-speedy");
     dispose();
   });
 

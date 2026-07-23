@@ -152,6 +152,102 @@ export type OriginalValueResolver = (style: CSSStyleDeclaration, property: strin
 const defaultResolveOriginalValue: OriginalValueResolver = (style, property) => style.getPropertyValue(property);
 
 /**
+ * Matches a declared value that is *entirely* a single `var(--name)` or
+ * `var(--name, fallback)` reference (optionally whitespace-padded) — the
+ * overwhelming majority of real-world custom-property-backed color
+ * declarations, including the confirmed MongoDB Atlas case
+ * (`background-color: var(--mdb-white)`). A value that combines a `var()`
+ * with other syntax (`color-mix(in srgb, var(--x) 50%, white)`, string
+ * concatenation, etc.) deliberately does not match — those fall through to
+ * the same "leave untouched" behavior as before this resolver existed,
+ * rather than risk misinterpreting a compound value.
+ */
+const SIMPLE_VAR_PATTERN = /^var\(\s*(--[a-zA-Z0-9_-]+)\s*(?:,([\s\S]+))?\)$/;
+
+/**
+ * Resolves a `var(--token)`-backed declared value to the literal color it
+ * references, by reading the browser's *computed value of the custom
+ * property itself* — never the computed value of the target property
+ * (`background-color` etc.) that Darkframe recolors. This distinction is
+ * load-bearing, not stylistic: reading the target property's computed
+ * value would reflect Darkframe's *own* previously-applied `!important`
+ * override once one exists, feeding an already-recolored color back in as
+ * if it were the original — the pole-based remap is a contraction toward a
+ * fixed point, not idempotent (see original-value-cache.ts's doc comment
+ * for the identical failure mode this project already fixed once, for
+ * inline styles), so this would silently drift the color darker on every
+ * render, converging on near-black. Confirmed as a real, reproduced bug in
+ * an earlier version of this function before landing on custom-property
+ * resolution instead. Reading the *custom property's* computed value has
+ * no such risk: Darkframe never writes to a custom property, only to
+ * `background-color`/`color`/border/outline longhands (see
+ * BACKGROUND_PROPERTIES/FOREGROUND_PROPERTIES above), so `--token`'s
+ * computed value is always the page author's, never Darkframe's own
+ * output — genuinely safe to recolor from, every render, indefinitely.
+ *
+ * `parseCssColor` only understands literal hex/rgb/hsl/named syntax and
+ * correctly returns null for a bare `var(...)` reference (it has no DOM to
+ * resolve a custom property against) — without this step, ANY declaration
+ * authored via a design token was silently left untouched entirely. Cheap
+ * for the overwhelming majority of declarations that don't reference a
+ * custom property at all: callers only invoke this after a
+ * `raw.includes("var(")` check, so no extra DOM work happens for plain
+ * literal colors.
+ */
+function resolveVarBackedValue(raw: string, computed: CSSStyleDeclaration | null, depth = 0): string {
+  if (!computed || depth > 4) return raw;
+  const match = raw.trim().match(SIMPLE_VAR_PATTERN);
+  if (!match) return raw;
+
+  const [, varName, fallback] = match;
+  const resolved = computed.getPropertyValue(varName!).trim();
+  if (resolved) return resolved;
+  if (fallback !== undefined) return resolveVarBackedValue(fallback.trim(), computed, depth + 1);
+  return raw;
+}
+
+/**
+ * Memoized per-root `selectorText -> matched element's computed style`
+ * lookup, used only to resolve `var()` references (see
+ * resolveVarBackedValue) for stylesheet rules — inline styles already have
+ * their own concrete element, so they skip this entirely. Scoped to a
+ * single computeTheme() call (a fresh cache is created on every call, never
+ * shared across renders): a custom property's resolved value can
+ * legitimately change between renders (e.g. a page flipping a
+ * `[data-theme]` attribute), and a fresh DOM/CSSOM snapshot is read on
+ * every render regardless, so nothing would be gained by caching longer —
+ * only correctness would be risked. Scoped *per root* (not globally) since
+ * the same selector text can exist in unrelated shadow roots matching
+ * different elements with different resolved custom-property values.
+ */
+function createComputedStyleResolver(fallbackWindow: Window | null) {
+  const cache = new WeakMap<Document | ShadowRoot, Map<string, CSSStyleDeclaration | null>>();
+  return function resolve(root: Document | ShadowRoot, selectorText: string): CSSStyleDeclaration | null {
+    let forRoot = cache.get(root);
+    if (!forRoot) {
+      forRoot = new Map();
+      cache.set(root, forRoot);
+    }
+    if (forRoot.has(selectorText)) return forRoot.get(selectorText)!;
+
+    let result: CSSStyleDeclaration | null = null;
+    const win = ("defaultView" in root ? root.defaultView : root.ownerDocument?.defaultView) ?? fallbackWindow;
+    if (win) {
+      try {
+        const matched = root.querySelector(selectorText);
+        if (matched) result = win.getComputedStyle(matched);
+      } catch {
+        // Invalid/unsupported selector syntax (rare — e.g. a vendor-
+        // specific pseudo-element) — leave unresolved, same as before this
+        // function existed.
+      }
+    }
+    forRoot.set(selectorText, result);
+    return result;
+  };
+}
+
+/**
  * Computes the full theme for a document: native-dark detection first
  * (short-circuiting to no overrides at all if the page already ships its
  * own dark theme), then a pass over every discovered stylesheet's rules,
@@ -171,6 +267,8 @@ export function computeTheme(
   if (nativeDark.isNativeDark) {
     return { isNativeDark: true, overridesByRoot: new Map(), directRewrites: [], inlineRewrites: [] };
   }
+
+  const resolveComputedStyleForSelector = createComputedStyleResolver(doc.defaultView);
 
   // A representative neutral dark background, used only as the contrast
   // backstop's comparison point (see ensureForegroundContrast) — not as
@@ -203,8 +301,12 @@ export function computeTheme(
       const properties: PropertyOverride[] = [];
 
       for (const property of ALL_THEMED_PROPERTIES) {
-        const raw = resolveOriginalValue(rule.style, property);
+        let raw = resolveOriginalValue(rule.style, property);
         if (!raw) continue;
+        if (raw.includes("var(")) {
+          const computed = resolveComputedStyleForSelector(discovered.root, rule.selectorText);
+          raw = resolveVarBackedValue(raw, computed);
+        }
 
         const value = computeRecoloredValue(raw, property, settings, assumedBackgroundRgb);
         if (!value) continue;
@@ -227,9 +329,15 @@ export function computeTheme(
   }
 
   for (const el of findInlineStyledElements(doc)) {
+    // An inline style already has its own concrete element — no selector
+    // lookup needed, unlike the stylesheet-rule pass above.
+    const elWindow = el.ownerDocument.defaultView ?? doc.defaultView;
     for (const property of ALL_THEMED_PROPERTIES) {
-      const raw = resolveOriginalValue(el.style, property);
+      let raw = resolveOriginalValue(el.style, property);
       if (!raw) continue;
+      if (raw.includes("var(") && elWindow) {
+        raw = resolveVarBackedValue(raw, elWindow.getComputedStyle(el));
+      }
 
       const value = computeRecoloredValue(raw, property, settings, assumedBackgroundRgb);
       if (!value) continue;

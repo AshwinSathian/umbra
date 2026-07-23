@@ -55,6 +55,20 @@ All notable changes to this project are documented in this file. The format is b
 - The engine rediscovering and recursively recoloring its own previously-injected stylesheet.
 - Non-hermetic unit tests silently making real DNS/network calls via happy-dom's default
   external-stylesheet loading.
+- CSS custom property (`var(--token)`) references in a `color`/`background-color`/border/
+  outline declaration were never resolved, so any element themed via a design token (as
+  `leafygreen-ui`, Tailwind, Material, Bootstrap 5, and most modern component libraries do)
+  was left untouched — reported live on MongoDB Atlas's Clusters page, where cluster cards
+  stayed solid white; root-caused to `.css-1y5u6ib { background-color: var(--mdb-white); }`,
+  an Emotion-injected rule. Now resolved via the referenced custom property's own computed
+  value (not the target property's, which would have fed the engine's own prior output back
+  into itself as a "recolor this again" input — see PLAN-darkframe.md for the feedback-loop
+  bug this distinction avoids).
+- CSS-in-JS libraries' production "speedy" rule insertion (`CSSStyleSheet.insertRule`/
+  `deleteRule`, used by Emotion and styled-components) was invisible to the engine's
+  `MutationObserver`-based change detection, so a class defined this way after a page's
+  initial load — common on long-lived SPA sessions — was never themed. Now also observed via
+  `dom/stylesheet-mutation-watch.ts`.
 
 ### Known gaps (tracked, not silently dropped)
 

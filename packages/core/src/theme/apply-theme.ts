@@ -12,6 +12,7 @@ import {
 import { InlineRewriteTracker } from "../dom/inline-rewrite-tracker.js";
 import { type DisposeFn, observeMutations } from "../dom/mutation-tree.js";
 import { OriginalValueCache } from "../dom/original-value-cache.js";
+import { observeStylesheetMutations } from "../dom/stylesheet-mutation-watch.js";
 import type { ImageSampler } from "../image/image-theme.js";
 import { ImageAnalysisCache, planImageOverrides } from "../image/image-theme.js";
 import { DEFAULT_THEME_SETTINGS, type ThemeSettings, computeTheme } from "./theme-engine.js";
@@ -192,10 +193,15 @@ export function applyTheme(
 
   render();
   const stopWatching = observeMutations(doc, render);
+  // Catches CSS-in-JS libraries' "speedy" insertRule()/deleteRule() writes,
+  // which are invisible to the MutationObserver above — see
+  // dom/stylesheet-mutation-watch.ts.
+  const stopWatchingStylesheets = observeStylesheetMutations(win, render);
 
   return () => {
     disposed = true;
     stopWatching();
+    stopWatchingStylesheets();
     for (const dispose of layerDisposersByRoot.values()) dispose();
     layerDisposersByRoot.clear();
     revertDirectRewrites(directRewriteEntries);

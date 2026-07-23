@@ -356,6 +356,80 @@ happy-dom's default link-stylesheet auto-fetching (fixed via `disableCSSFileLoad
 leaking a listening HTTP server on an error path). All are fixed and covered by tests as of
 this section being written.
 
+## 🌐 Real-World Compatibility Fixes (post-v1)
+
+User report: MongoDB Atlas's Clusters page (`cloud.mongodb.com`) rendered with its cluster
+cards staying solid white under Darkframe, while the rest of the page themed correctly and
+noticeably better than Dark Reader's handling of the same page. Diagnosed against the actual
+live page (via a DevTools console snippet walking up from the white element to whichever
+ancestor owns the visible background, then cross-referencing every stylesheet rule matching
+it) rather than guessing — this pinned the exact declaration responsible:
+`.css-1y5u6ib { background-color: var(--mdb-white); }`, injected into an inline `<style>` tag
+by Emotion (the CSS-in-JS library underlying MongoDB's `leafygreen-ui` design system). Two
+real, distinct engine gaps were found and fixed as a result — both reproduced against the
+real built extension in a real Chromium instance (via Playwright) before and after the fix,
+not just unit-tested:
+
+- **`var(--token)` references were never resolved (root cause of the reported bug).**
+  `color/parse.ts`'s `parseCssColor` correctly returns `null` for anything it can't parse as
+  a literal color — including any `var(...)` reference, since resolving a custom property
+  requires DOM/cascade context that a pure string parser deliberately doesn't have. But
+  nothing upstream of it ever supplied that context, so *any* declaration authored via a
+  design token (the standard pattern for `leafygreen-ui`, Tailwind, Material, Bootstrap 5,
+  GitHub Primer, Radix, and most other modern component libraries) was silently left
+  untouched — not a MongoDB-specific bug, a general gap affecting any custom-property-based
+  design system. **Fix**: `theme/theme-engine.ts` now detects a `raw.includes("var(")` value
+  and, for the common case of a value that is *entirely* one `var(--name)`/`var(--name,
+  fallback)` reference, resolves `--name` via `getComputedStyle(...).getPropertyValue("--name")`
+  on a representative matching element (`root.querySelector(rule.selectorText)` for
+  stylesheet rules, memoized per selector per render; the concrete element directly for
+  inline styles). **A first version of this fix read the computed value of the *target*
+  property instead (e.g. `background-color`) and was caught, before landing, by the same
+  drift-check discipline `original-value-cache.ts` documents**: once Darkframe's own
+  `!important` override for that property existed, reading it back via `getComputedStyle`
+  fed the engine's own prior output back in as if it were the page's original color — and the
+  pole-based remap is a contraction toward a fixed point, not idempotent, so this compounded
+  every render, visibly drifting the color darker and darker (confirmed in the same Playwright
+  repro used to diagnose the bug — a page left open long enough converged toward near-black).
+  Resolving the *custom property itself* has no such risk: Darkframe never writes to a custom
+  property, only to the longhands in `BACKGROUND_PROPERTIES`/`FOREGROUND_PROPERTIES`, so
+  `--name`'s computed value is always the page author's, unconditionally safe to recolor from
+  on every render. Zero cost for the overwhelming majority of declarations that don't use a
+  custom property (the `includes("var(")` check gates all of it); a value that combines
+  `var()` with other syntax (`color-mix(...)`, concatenation) deliberately doesn't match and
+  falls through to the pre-existing "leave untouched" behavior rather than risk
+  misinterpreting a compound value. Covered by `theme-engine.test.ts` (stylesheet-rule and
+  inline-style cases, a no-matching-element case proving it degrades safely rather than
+  throwing) and by re-running the real-Chromium repro for several more render cycles after
+  the fix to confirm the color had genuinely settled, not just looked right once.
+- **CSS-in-JS "speedy" rule insertion (`CSSStyleSheet.insertRule`/`deleteRule`) is invisible
+  to the engine's only other change-detection mechanism.** `dom/mutation-tree.ts`'s
+  `MutationObserver` watches DOM tree/attribute changes; it has no way to observe a CSSOM
+  rule-list mutation, which is exactly how Emotion's (and styled-components') production
+  "speedy" mode writes new rules, specifically because it's faster than the DOM-visible
+  alternative. Confirmed via a synthetic repro isolating the mechanism: a class already
+  present on an element at page load, whose defining rule is inserted later via
+  `insertRule()` with no other DOM mutation anywhere on the page, stayed unthemed
+  indefinitely. In practice this was *partially* masked by apply-theme.ts's one-shot
+  image-scan/cross-origin-CSS-warm completion callbacks incidentally re-rendering shortly
+  after page load — but those each fire once and stop, so any rule inserted after that early
+  window, on a long-lived SPA session (exactly what a cloud console like Atlas is), had no
+  path back to being picked up. **Fix**: new `dom/stylesheet-mutation-watch.ts` patches
+  `CSSStyleSheet.prototype.insertRule`/`deleteRule` (which every grouping rule type —
+  `@media`, `@supports`, `@layer` — inherits, so this one patch point covers all of them) to
+  trigger the same re-render pipeline, batched to at most once per microtask, wired in
+  alongside the existing `MutationObserver` in `theme/apply-theme.ts`. Deliberately scoped to
+  just these two methods, not `CSSStyleDeclaration.prototype.setProperty` (which inline
+  styles and the CSSOM-direct-rewrite fallback also use for their own writes, and would need
+  reentrancy-guarding on a much hotter call path for comparatively little real-world benefit —
+  see the doc comment in that file for the full reasoning). Covered by a dedicated
+  `stylesheet-mutation-watch.test.ts` plus an `apply-theme.test.ts` integration test
+  reproducing the exact isolated scenario above end-to-end.
+
+Both fixes were verified against the real built extension in real Chromium via a throwaway
+Playwright repro harness before committing to a diagnosis, then covered by proper unit/
+integration tests as the durable regression guard.
+
 ## 🧪 Testing Strategy
 
 - **Unit tests (Vitest)**: `packages/core/color` (OKLCH round-trip, gamut mapping, contrast solver — property-based + fixed-case tests), `packages/core/image` (classifier decision table against synthetic fixtures), `packages/core/dom` (style discovery against jsdom/happy-dom fixtures, injector mutation-free guarantee). Target ≥ 90% line coverage on `packages/core`.
