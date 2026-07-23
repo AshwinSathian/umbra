@@ -14,8 +14,10 @@ pnpm lint
 pnpm typecheck
 ```
 
-To run the Chrome extension locally, see [README.md](./README.md#running-the-chrome-extension-locally).
-To run the Safari extension locally, see [README.md](./README.md#running-the-safari-extension-locally-macos-free--no-apple-developer-account-required).
+To build and try the extension in a real Chrome and/or Safari in one step, run
+`pnpm install:local` — see [README.md](./README.md#try-it-now-before-either-store-listing-is-live).
+For the individual manual commands: [Chrome](./README.md#running-the-chrome-extension-locally),
+[Safari](./README.md#running-the-safari-extension-locally-macos-free--no-apple-developer-account-required).
 
 ## Before opening a PR
 

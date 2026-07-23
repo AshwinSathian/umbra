@@ -39,6 +39,31 @@ architecture/quality audit — see PLAN-darkframe.md's "Security Hardening" sect
 real vulnerabilities found and fixed, and the "Follow-up Work" / Data Flow sections for the
 quality findings addressed.
 
+## Try it now (before either store listing is live)
+
+Neither store submission is live yet (see [RELEASING.md](./RELEASING.md)), but nothing about
+that blocks using Darkframe today — one script builds it from source and gets it into a real
+Chrome and/or Safari on this machine:
+
+```sh
+pnpm install
+pnpm install:local            # builds + sets up whatever this OS supports
+```
+
+It installs dependencies, builds the extension, structurally validates the build output
+(catches a truncated build before you try to load it), and — unless `--no-open` is
+passed — opens a detected Chromium-family browser straight to `chrome://extensions` (with
+the unpacked-extension folder path already on your clipboard) and, on macOS, builds the
+Safari Xcode project and launches the resulting app. The one manual click each browser still
+requires ("Load unpacked" in Chrome, enabling the extension in Safari's Settings) is a
+deliberate security boundary neither browser exposes to scripts — see the comment at the top
+of [`scripts/install-local.mjs`](./scripts/install-local.mjs) for the full option list
+(`--chrome`, `--safari`, `--all`, `--no-open`, `--verify`, `--skip-install`, `--help`) and
+what each target validates. Safe to re-run any time, e.g. after pulling new changes.
+
+The sections below document the same two paths by hand, for anyone who'd rather run the
+individual commands themselves or is auditing what the script does.
+
 ## Development
 
 ```sh

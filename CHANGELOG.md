@@ -20,6 +20,12 @@ All notable changes to this project are documented in this file. The format is b
 - End-to-end verification (`tests/e2e/verify-extension.mjs`) driving the real built
   extension in a real Chromium instance via Playwright.
 - `PLAN-darkframe.md`: the project's architecture RFC and running design/bug log.
+- `scripts/install-local.mjs` (`pnpm install:local`): builds Darkframe from source and sets
+  it up in a real Chrome and/or Safari on this machine, ahead of either store listing going
+  live — structurally validates the build output, detects and opens an installed
+  Chromium-family browser straight to `chrome://extensions` with the unpacked-extension path
+  copied to the clipboard, and on macOS builds the Safari Xcode project and launches the
+  resulting app.
 
 ### Changed
 

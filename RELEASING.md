@@ -180,14 +180,16 @@ notes you filled in step 4 are there specifically to make that fast.
   review" option — don't delete that path, it's the only route available to anyone before
   this ships and remains valuable for contributors/auditors.
 
-## Interim: Safari build-from-source stays available throughout
+## Interim: build-from-source stays available throughout, for both platforms
 
-Nothing above blocks people from using Safari today. `README.md` already documents
-`pnpm --filter @darkframe/ext-safari build` + opening the Xcode project + Run, which works
-right now with zero Apple Developer Program dependency (ad-hoc "Sign to Run Locally" signing,
-confirmed working in this repo's history). Keep pointing people there until the App Store
-listing is live, and keep the instructions afterward for anyone who prefers building from
-source.
+Nothing above blocks anyone with this repo from using Darkframe today, on either platform.
+`README.md`'s "Try it now" section documents `pnpm install:local`
+(`scripts/install-local.mjs`), which builds from source and does as much of the local
+Chrome/Safari setup as either browser lets a script do — no store listing, no Apple Developer
+Program dependency (ad-hoc "Sign to Run Locally" signing for Safari, confirmed working in
+this repo's history). Keep pointing people there until both listings are live, and keep the
+instructions (and the script) afterward for anyone who prefers building from source or wants
+to audit the exact code running in their browser.
 
 ## Tagging a release
 
