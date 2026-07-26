@@ -15,7 +15,7 @@ import { OriginalValueCache } from "../dom/original-value-cache.js";
 import { observeStylesheetMutations } from "../dom/stylesheet-mutation-watch.js";
 import type { ImageSampler } from "../image/image-theme.js";
 import { ImageAnalysisCache, planImageOverrides } from "../image/image-theme.js";
-import { DEFAULT_THEME_SETTINGS, type ThemeSettings, computeTheme } from "./theme-engine.js";
+import { DEFAULT_THEME_SETTINGS, type ThemeSettings, VarResolutionCache, computeTheme } from "./theme-engine.js";
 
 /**
  * The single function that touches the live DOM. Computes the theme,
@@ -77,6 +77,12 @@ export function applyTheme(
   // on every mutation-triggered re-render, even ones whose src never
   // changed. See image/image-theme.ts's ImageAnalysisCache doc comment.
   const imageAnalysisCache = new ImageAnalysisCache();
+  // Memoizes var()-backed color resolution across renders — same "don't
+  // redo expensive work that didn't change" reasoning as the two caches
+  // above, but for the forced-synchronous-layout cost of `getComputedStyle`
+  // on every var()-backed rule. See VarResolutionCache's doc comment in
+  // theme-engine.ts for why persisting this across renders is safe.
+  const varResolutionCache = new VarResolutionCache();
   let latestImageOverrides: SelectorOverride[] = [];
   let imageScanInFlight = false;
   let crossOriginScanInFlight = false;
@@ -160,7 +166,12 @@ export function applyTheme(
   }
 
   function render(shouldScanImages = true, shouldScanCrossOrigin = true) {
-    const result = computeTheme(doc, settings, (style, property) => originalValues.resolve(style, property));
+    const result = computeTheme(
+      doc,
+      settings,
+      (style, property) => originalValues.resolve(style, property),
+      varResolutionCache,
+    );
 
     if (result.isNativeDark) {
       renderLayerPath(new Map());
@@ -191,12 +202,50 @@ export function applyTheme(
     }
   }
 
+  // Coalesces the two independent change-detection mechanisms below (plus
+  // any other same-tick call) into a single render, on top of the
+  // debouncing each already does for its *own* rapid-fire bursts — they
+  // don't know about each other, so if both happened to request a render
+  // in the same tick, this used to mean two full re-renders back to back
+  // instead of one. (Whether `observeStylesheetMutations`'s trigger fires
+  // at all for real page authored CSS in a shipped extension is a
+  // separate, larger question — see that module's doc comment for a real
+  // limitation found during this investigation. This coalescing layer is
+  // correct and worth keeping regardless: it's cheap insurance against
+  // redundant back-to-back renders from any current or future same-tick
+  // signal source.)
+  //
+  // Deliberately debounces via `setTimeout(0)` (a macrotask), not another
+  // `queueMicrotask` layer: a native `MutationObserver` callback and an
+  // explicit `queueMicrotask` callback queued during the same synchronous
+  // script are not guaranteed to interleave in a way that a *third*,
+  // nested `queueMicrotask` reliably catches both before the first one's
+  // callback runs — confirmed empirically (a microtask-based version of
+  // this scheduler measurably failed to coalesce two same-tick signals in
+  // a real-Chromium repro). A macrotask timer is always scheduled *after*
+  // the entire microtask queue has fully drained, regardless of internal
+  // relative ordering between mechanisms, so it reliably observes every
+  // "please re-render" signal from the same tick before firing once. The
+  // added latency (one macrotask turnaround, imperceptible for a theme
+  // update) is a good trade for actually guaranteeing the coalescing this
+  // exists for. See PLAN-darkframe.md.
+  let renderScheduled = false;
+  function scheduleRender() {
+    if (renderScheduled || disposed) return;
+    renderScheduled = true;
+    setTimeout(() => {
+      renderScheduled = false;
+      if (disposed) return;
+      render();
+    }, 0);
+  }
+
   render();
-  const stopWatching = observeMutations(doc, render);
-  // Catches CSS-in-JS libraries' "speedy" insertRule()/deleteRule() writes,
-  // which are invisible to the MutationObserver above — see
-  // dom/stylesheet-mutation-watch.ts.
-  const stopWatchingStylesheets = observeStylesheetMutations(win, render);
+  const stopWatching = observeMutations(doc, scheduleRender);
+  // Same-realm CSSOM rule insertion/deletion (see dom/stylesheet-mutation-
+  // watch.ts's doc comment for the significant caveat on what this
+  // actually covers in a real extension's isolated-world content script).
+  const stopWatchingStylesheets = observeStylesheetMutations(win, scheduleRender);
 
   return () => {
     disposed = true;

@@ -67,8 +67,13 @@ All notable changes to this project are documented in this file. The format is b
 - CSS-in-JS libraries' production "speedy" rule insertion (`CSSStyleSheet.insertRule`/
   `deleteRule`, used by Emotion and styled-components) was invisible to the engine's
   `MutationObserver`-based change detection, so a class defined this way after a page's
-  initial load — common on long-lived SPA sessions — was never themed. Now also observed via
-  `dom/stylesheet-mutation-watch.ts`.
+  initial load — common on long-lived SPA sessions — was never themed. `dom/stylesheet-
+  mutation-watch.ts` was added to also observe these calls — **correction, found during a
+  later performance investigation**: this only works for calls made from the *same* JS realm,
+  and a real installed extension's content script runs in an isolated world that does not
+  share `CSSStyleSheet.prototype` with the page's own scripts, so it currently does not
+  intercept a real page's own CSS-in-JS `insertRule` calls at all. See "Known gaps" below and
+  the doc comment at the top of `dom/stylesheet-mutation-watch.ts`.
 - A `var(--token)` reference gated behind `:hover`/`:focus`/`:focus-visible`/`:focus-within`/
   `:active`/`:visited` was never resolved — reported live on npmjs.com's account menu, where
   the hover/focus highlight stayed at its original light color inside an otherwise
@@ -87,8 +92,51 @@ All notable changes to this project are documented in this file. The format is b
   the shorthand's entire value is the one reference (unambiguous); a shorthand with other
   content alongside it (`border: 1px solid var(--x)`) is deliberately left untouched rather
   than guess which sub-property the reference was meant for.
+- Real, measured jank on content-heavy pages (reported live on a LinkedIn job-search results
+  page — infinite scroll, lots of DOM churn), introduced by the `var()`-resolution work above:
+  every mutation-triggered render was re-running `querySelector` + `getComputedStyle` — a
+  forced synchronous layout — for *every* `var()`-backed rule in the stylesheet, every single
+  time, even though the resolved value essentially never changes between renders. Confirmed
+  and quantified via a real-Chromium repro simulating an infinite-scroll SPA with a
+  ~3,000-rule stylesheet: 452ms spent inside `computeTheme()` and 630 `getComputedStyle` calls
+  across a 15-batch scroll session. **Fix**: `VarResolutionCache` (`theme/theme-engine.ts`)
+  now persists this resolution across renders instead of recomputing it every time — safe
+  because `getComputedStyle()`'s return value is live (confirmed, not assumed: querying a
+  previously-obtained reference reflects the *current* value even after the underlying custom
+  property changes), with a `isConnected` check to safely re-resolve if the originally-matched
+  element is later removed (list virtualization). Cut `getComputedStyle` calls by 95% (630 ->
+  30) and total `computeTheme()` time by 60% (452ms -> 172ms) in the same repro, with zero
+  behavior change. Also coalesced the (previously independent) DOM-mutation and stylesheet-
+  mutation change-detection paths into one shared, macrotask-debounced scheduler, so two
+  "please re-render" signals arriving in the same tick collapse into a single render rather
+  than two back-to-back ones.
+- **Caught before shipping, while verifying the fix above**: the cache's first version treated
+  a selector matching *nothing* the same as a real match — permanently. Content-heavy pages
+  routinely define a class's CSS before any element with that class exists yet (content
+  streamed in later via infinite scroll); caching "no match" would have permanently stuck any
+  such selector unthemed the instant it was first checked too early. Fixed by only ever caching
+  positive matches — a "no match" always retries fresh next render, which is safe to redo
+  unconditionally since selector matching (unlike `getComputedStyle`) doesn't force a style
+  recalculation.
 
 ### Known gaps (tracked, not silently dropped)
+
+- `dom/stylesheet-mutation-watch.ts`'s `CSSStyleSheet.insertRule`/`deleteRule` watching
+  (added for CSS-in-JS "speedy" mode support, see above) currently has no effect on a real
+  page's own script calls: a content script runs in an isolated JS world that does not share
+  `CSSStyleSheet.prototype` with the page's main-world scripts, so the patch only ever
+  intercepts same-realm calls — which, in a shipped extension, Darkframe itself never makes
+  on a real page stylesheet. Confirmed directly against a real Chromium instance: from the
+  main world, `CSSStyleSheet.prototype.insertRule.toString()` still shows unmodified native
+  code after the isolated-world patch runs, and a real page's own `insertRule` call never
+  triggers a re-render. Fixing this properly needs a *main-world* script (via
+  `chrome.scripting.registerContentScripts(..., { world: "MAIN" })` on Chrome — the static
+  manifest `"world": "MAIN"` declaration has a longstanding Chrome bug and doesn't reliably
+  work — and Safari's equivalent, supported since Safari 16.4) bridging back to the isolated
+  world via a `CustomEvent`. Scoped out of the performance-fix pass that discovered this
+  because it needs a new `scripting` permission and a new build target — a real
+  permission-surface change that deserves its own store-listing justification update, not a
+  silent addition alongside an unrelated jank fix.
 
 - No FOUC (flash of unstyled content) mitigation yet on first paint (the initial
   `chrome.storage.local` round-trip was halved — see Changed — but the flash itself isn't

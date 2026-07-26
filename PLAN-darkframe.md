@@ -501,6 +501,109 @@ confirmed case) in two ways:
   reproducible in happy-dom, which over-eagerly expands it — confirmed experimentally — so the
   test targets the resulting condition directly rather than fighting the test environment).
 
+### Follow-up: real jank on content-heavy pages, and a correction to the insertRule fix above
+
+User report: scrolling a content-heavy page (LinkedIn's job-search results — infinite scroll,
+continuous DOM churn) felt stuck/jumpy with Darkframe active, after the `var()`-resolution and
+`insertRule`-watching work above shipped. Rather than guess, this was reproduced and quantified
+directly: a synthetic infinite-scroll SPA fixture (a ~3,000-rule stylesheet — a realistic
+large-app bundle size — with design-token `var()`-backed color declarations, simulating 15
+"load more" batches of 30 new cards each) driven against the real built extension in real
+Chromium, with temporary instrumentation counting renders, `getComputedStyle` calls, and
+`computeTheme()` wall-clock time.
+
+**Measured before fixing**: 30 full re-renders across the 15-batch session, 630
+`getComputedStyle` calls, 452ms total time inside `computeTheme()` — each render walking the
+*entire* stylesheet fresh (`rulesWalked` climbing linearly with page size, since
+`computeTheme` has no incremental/differential mode) and, for every `var()`-backed rule,
+re-running `querySelector` + `getComputedStyle` (a forced synchronous layout) even though nine
+times out of ten the selector and its resolved custom-property value hadn't changed since the
+previous render at all — loading more list items doesn't change what a design token resolves
+to.
+
+**Fix**: `VarResolutionCache` (`theme/theme-engine.ts`) — previously an in-function closure
+recreated fresh on every single `computeTheme()` call, deliberately, on the theory that
+caching across renders risked returning a stale value — now persists across renders (owned by
+`apply-theme.ts`, same lifecycle as `OriginalValueCache`/`ImageAnalysisCache`). The original
+staleness worry turned out to be solvable, not a real constraint: confirmed experimentally
+that `getComputedStyle()`'s return value is *live* — reading a property on a
+previously-obtained `CSSStyleDeclaration` reference reflects the value *at read time*, not at
+the time the reference was obtained, even after the underlying custom property changes (e.g.
+a page toggling its own `[data-theme]` attribute). So caching the reference itself, not a
+resolved string, is safe indefinitely — the one real risk is the originally-matched element
+being later removed from the DOM (list virtualization), which the cache now guards against
+via an `Element.isConnected` check, re-resolving fresh when the cached element is gone. Result
+in the same repro: `getComputedStyle` calls down 95% (630 -> 30 — only genuinely *new*
+selectors ever cost anything now), total `computeTheme()` time down 60% (452ms -> 172ms), zero
+behavior change (all 131 existing tests pass unmodified).
+
+**A second, more serious bug found while verifying the cache fix itself** (caught before it
+shipped, not after): the first version of `VarResolutionCache` cached a "nothing matched"
+result the exact same way as a real match — permanently. This is wrong in a way that mirrors
+exactly the kind of page this whole investigation is about: content-heavy sites routinely
+define a class's CSS (via a shared bundle, or a burst of `insertRule` calls) *before* any
+element with that class exists in the DOM yet, with matching content streamed in afterward
+(infinite scroll, lazy-mounted components). Reproduced directly: inserting 3,000 unrelated
+bulk rules *before* adding a real `var()`-backed card to the DOM left that card permanently
+unthemed, even though it rendered correctly moments earlier without the bulk insert and even
+though the identical CSS/DOM combination worked fine when the bulk rules were inserted
+*after* the card already existed — the only variable was *timing*, exactly the kind of
+timing-dependent bug that's easy to ship if verification doesn't specifically probe for
+selectors matching late. **Fix**: only cache a positive match (element + its computed style);
+a "nothing matched" result is *never* cached, so every render retries a fresh
+`querySelector` for a selector that hasn't matched yet — which is safe to redo unconditionally
+because `querySelector` is a structural DOM-tree query with no dependency on computed
+style/layout, unlike `getComputedStyle`, which forces the synchronous style recalculation this
+cache exists to avoid in the first place. So the actually-expensive operation stays bounded to
+real matches, while correctness for late-appearing content is never at risk. Covered by a
+dedicated regression test reproducing the exact before/after-element-exists sequence, and
+re-verified against the real built extension in real Chromium (both the isolated repro and the
+full 15-batch scroll session) after the fix.
+
+Also added: the two independent change-detection mechanisms (`observeMutations` for DOM
+mutations, `observeStylesheetMutations` for CSSOM rule insertion) previously called `render`
+directly, each with its own microtask-batching, but with no coordination between them — if
+both requested a render in the same tick, that meant two full re-renders back to back. A
+shared, macrotask-debounced (`setTimeout(0)`, not another `queueMicrotask` layer — confirmed
+empirically that nested `queueMicrotask` doesn't reliably catch both a native
+`MutationObserver` callback and an explicit `queueMicrotask` callback queued in the same tick,
+since their relative ordering isn't guaranteed; a macrotask timer always fires after the
+entire microtask queue drains regardless) scheduler now coalesces same-tick signals from
+either mechanism into one render.
+
+**A significant correction, found while building the repro above**: verifying the fix
+required calling `sheet.insertRule(...)` from a real page's main-world JavaScript (via
+Playwright's `page.evaluate()`) against the real built extension — the first time this
+project's own verification exercised that exact cross-context path, rather than same-realm
+JavaScript inside a Vitest/happy-dom test or inside the extension's own driving script. That
+call **never triggered `dom/stylesheet-mutation-watch.ts`'s `onChange` at all**. Direct
+inspection confirmed why: a Chrome extension's content script executes in an isolated JS
+world that shares the page's DOM/CSSOM state but does *not* share built-in prototype objects
+— `window.CSSStyleSheet.prototype.insertRule.toString()`, checked from the main world after
+the isolated-world patch ran, still reported unmodified native code. The earlier "CSS-in-JS
+insertRule watching" fix (previous section) was verified only against same-realm test/repro
+code (Vitest has no isolated/main-world distinction at all, and the earlier MongoDB/npm
+repros drove `insertRule` from the *same* script context as the assertions) — it never
+actually exercised a real page's own script calling `insertRule`, so a real gap passed
+unnoticed. In production, this means the feature currently has no effect for its stated
+purpose: it does not intercept a real page's own CSS-in-JS `insertRule` calls, only same-realm
+ones — which the extension itself never makes on a real page stylesheet.
+
+This does not affect the jank fix above (the cross-world gap means `insertRule` watching
+contributes zero extra renders for real pages, not extra ones) and does not regress anything
+that previously worked — but it does mean the original fix's headline claim was wrong, and
+this file's own earlier description of it needs this correction rather than silent
+superseding. Properly closing the gap needs a *main-world* script (via Chrome's
+`chrome.scripting.registerContentScripts(..., { world: "MAIN" })` — the static manifest
+`"world": "MAIN"` declaration has a longstanding Chrome bug and doesn't reliably work — and
+Safari's equivalent, supported since Safari 16.4) bridging back to the isolated-world listener
+via a `CustomEvent` (DOM events, unlike prototypes, do cross the isolated/main-world
+boundary). Deliberately not implemented in this pass: it needs a new `scripting` permission
+and a new build target on both shells, which is a real permission-surface expansion that
+deserves its own store-listing permission-justification update (see RELEASING.md's existing
+process for exactly this), not a silent addition riding alongside an unrelated jank fix. See
+CHANGELOG.md's "Known gaps" for the tracked entry.
+
 ## 🧪 Testing Strategy
 
 - **Unit tests (Vitest)**: `packages/core/color` (OKLCH round-trip, gamut mapping, contrast solver — property-based + fixed-case tests), `packages/core/image` (classifier decision table against synthetic fixtures), `packages/core/dom` (style discovery against jsdom/happy-dom fixtures, injector mutation-free guarantee). Target ≥ 90% line coverage on `packages/core`.

@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { contrastRatio } from "../color/contrast.js";
 import { parseCssColor } from "../color/parse.js";
 import { clearCrossOriginSheetCache, warmCrossOriginSheetCache } from "../dom/cross-origin-cache.js";
 import { OriginalValueCache } from "../dom/original-value-cache.js";
-import { computeTheme } from "./theme-engine.js";
+import { VarResolutionCache, computeTheme } from "./theme-engine.js";
 
 describe("computeTheme", () => {
   beforeEach(() => {
@@ -283,5 +283,111 @@ describe("computeTheme", () => {
     const rewrite = result.directRewrites[0]!;
     const recolored = parseCssColor(rewrite.value)!;
     expect(recolored.a).toBeCloseTo(0.5, 2);
+  });
+});
+
+describe("VarResolutionCache", () => {
+  beforeEach(() => {
+    document.head.innerHTML = "";
+    document.body.innerHTML = "";
+  });
+
+  it("does not re-run getComputedStyle for a selector already resolved on a previous computeTheme() call, when reusing the same cache instance", () => {
+    // Reproduces the fix for real, measured jank on content-heavy pages
+    // (reported live on a LinkedIn job-search page — infinite scroll, lots
+    // of DOM churn): re-resolving the same var()-backed selector's custom
+    // property on every single render, even though its resolved value
+    // essentially never changes between renders, meant hundreds of forced-
+    // synchronous-layout getComputedStyle calls across a scroll session —
+    // see PLAN-darkframe.md. A persistent cache should only ever call
+    // getComputedStyle once per selector, no matter how many renders follow.
+    const style = document.createElement("style");
+    style.textContent = ".card { --bg: #ffffff; background-color: var(--bg); }";
+    document.head.appendChild(style);
+    const card = document.createElement("div");
+    card.className = "card";
+    document.body.appendChild(card);
+
+    const getComputedStyleSpy = vi.spyOn(window, "getComputedStyle");
+    const cache = new VarResolutionCache();
+
+    computeTheme(document, undefined, undefined, cache);
+    const callsAfterFirst = getComputedStyleSpy.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    computeTheme(document, undefined, undefined, cache);
+    const callsAfterSecond = getComputedStyleSpy.mock.calls.length;
+
+    computeTheme(document, undefined, undefined, cache);
+    const callsAfterThird = getComputedStyleSpy.mock.calls.length;
+
+    // Each render also calls getComputedStyle once for native-dark
+    // detection (site-detect/native-dark.ts) — unrelated to var()
+    // resolution, uncached, and correctly so (it must reflect the page's
+    // *current* state every time). So each subsequent render still adds
+    // exactly one call from that — the assertion is that it adds *no more
+    // than* that, i.e. zero additional calls from the already-resolved
+    // var()-backed selector.
+    expect(callsAfterSecond - callsAfterFirst).toBe(1);
+    expect(callsAfterThird - callsAfterSecond).toBe(1);
+    getComputedStyleSpy.mockRestore();
+  });
+
+  it("re-resolves fresh (self-heals) if the previously-matched element is later removed from the DOM, instead of reusing a now-detached reference", () => {
+    // The realistic trigger for this: list virtualization on a long
+    // scrolling page recycles/removes off-screen elements — a cached
+    // reference to a *removed* element would silently report stale/initial
+    // computed values instead of the design token's real value.
+    const style = document.createElement("style");
+    style.textContent = ".card { --bg: #ffffff; background-color: var(--bg); }";
+    document.head.appendChild(style);
+    const firstCard = document.createElement("div");
+    firstCard.className = "card";
+    document.body.appendChild(firstCard);
+
+    const cache = new VarResolutionCache();
+    const firstResult = computeTheme(document, undefined, undefined, cache);
+    expect(firstResult.directRewrites.some((r) => r.property === "background-color")).toBe(true);
+
+    firstCard.remove();
+    const secondCard = document.createElement("div");
+    secondCard.className = "card";
+    document.body.appendChild(secondCard);
+
+    const secondResult = computeTheme(document, undefined, undefined, cache);
+    const rewrite = secondResult.directRewrites.find((r) => r.property === "background-color");
+    expect(rewrite).toBeDefined();
+    const recolored = parseCssColor(rewrite!.value)!;
+    expect(recolored.r).toBeLessThan(0.3);
+  });
+
+  it("REGRESSION: a selector that matches nothing on an early render still gets resolved once a matching element appears later, instead of being permanently stuck unthemed", () => {
+    // A real, serious bug found while verifying the fix above against a
+    // real Chromium instance: content-heavy pages routinely define a
+    // class's CSS (in a shared stylesheet, or via a bulk insertRule() burst
+    // ahead of the content that will use it) before any element with that
+    // class exists in the DOM yet. An earlier version of this cache
+    // treated a "nothing matched" result as a permanent, reusable answer —
+    // so the very first check, made before the matching element existed,
+    // would silently and permanently prevent that selector from ever being
+    // themed, even once a real matching element showed up on every
+    // subsequent render.
+    const style = document.createElement("style");
+    style.textContent = ".late-card { --bg: #ffffff; background-color: var(--bg); }";
+    document.head.appendChild(style);
+
+    const cache = new VarResolutionCache();
+    const beforeElementExists = computeTheme(document, undefined, undefined, cache);
+    expect(beforeElementExists.directRewrites.some((r) => r.property === "background-color")).toBe(false);
+
+    const card = document.createElement("div");
+    card.className = "late-card";
+    document.body.appendChild(card);
+
+    const afterElementExists = computeTheme(document, undefined, undefined, cache);
+    const rewrite = afterElementExists.directRewrites.find((r) => r.property === "background-color");
+    expect(rewrite).toBeDefined();
+    const recolored = parseCssColor(rewrite!.value)!;
+    expect(recolored.r).toBeLessThan(0.3);
   });
 });

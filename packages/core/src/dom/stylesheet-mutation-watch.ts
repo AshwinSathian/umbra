@@ -8,22 +8,40 @@ import type { DisposeFn } from "./mutation-tree.js";
  * same-realm script adds or removes a rule this way, batched to at most
  * once per microtask.
  *
- * This exists because `MutationObserver` — the theme engine's only other
- * change-detection mechanism (see mutation-tree.ts) — observes DOM tree and
- * attribute changes, never CSSOM rule-list mutations. Production-mode
- * CSS-in-JS ("speedy" Emotion, styled-components) writes new rules exactly
- * this way, specifically because it's faster than the DOM-visible
- * alternative (a new `<style>` element per class, or rewriting a `<style>`
- * element's `textContent`) — so without this, any class defined through one
- * of those libraries after a page's initial load was invisible to the
- * theme engine, with no DOM signal of any kind marking the moment it became
- * themeable. Previously the only thing that ever incidentally re-rendered
- * after such a change was the one-shot image-scan/cross-origin-CSS-warm
- * completion callback in apply-theme.ts — real, but a coincidence of timing
- * that stops covering anything once those two one-time scans finish early
- * in a page's life; a long-lived SPA session (e.g. MongoDB Atlas, whose
- * `leafygreen-ui` design system is Emotion-based) can keep inserting new
- * rules this way for as long as the tab stays open.
+ * **Known, significant limitation, found after this shipped**: in a real
+ * Chrome/Safari extension, this content script runs in an *isolated world*
+ * — a separate JS realm that shares the page's DOM/CSSOM state but does
+ * *not* share built-in prototype objects like `CSSStyleSheet.prototype`
+ * with the page's own ("main world") JavaScript. Patching the isolated
+ * world's copy of `CSSStyleSheet.prototype` has **no effect whatsoever on
+ * insertRule/deleteRule calls made by the page's own scripts** — confirmed
+ * directly (not assumed): from the main world, `CSSStyleSheet.prototype
+ * .insertRule.toString()` still reports unmodified native code after this
+ * patch runs, and a real page-authored `sheet.insertRule(...)` call never
+ * triggers `onChange` here. Since Darkframe itself never calls either
+ * method on a real page stylesheet either (only on a throwaway detached
+ * sheet for feature detection — see layer-injector.ts's
+ * supportsCascadeLayers), this function currently has **no real-world
+ * effect for its stated purpose** — it is not a bug in the sense of doing
+ * the wrong thing, it simply never fires. The original design intent (and
+ * what the doc comment here used to claim as verified) — catching
+ * production-mode CSS-in-JS "speedy" `insertRule` writes (Emotion,
+ * styled-components) that are invisible to `MutationObserver` — needs a
+ * *main-world* script to actually intercept page code, bridged back to
+ * this isolated-world listener via a DOM `CustomEvent` (events, unlike
+ * prototypes, do cross the isolated/main-world boundary). That requires
+ * either `chrome.scripting.registerContentScripts(..., { world: "MAIN" })`
+ * (Chrome; static manifest `"world": "MAIN"` has a longstanding Chrome bug
+ * and doesn't reliably work) or Safari's equivalent (supported since Safari
+ * 16.4) — both need a new `scripting` permission and a new build target,
+ * which is a real permission-surface change deserving its own dedicated
+ * pass with its own store-listing justification update, not a silent
+ * addition here. Tracked as a known gap in CHANGELOG.md rather than
+ * silently left overclaimed. Left in place (rather than deleted) because
+ * it's harmless — it only ever fires for same-realm calls, which in
+ * practice means only this module's own unit tests exercise it, at zero
+ * cost to a real page — and it's the correct foundation to wire the
+ * main-world bridge into once that follow-up work happens.
  *
  * Deliberately does NOT patch `CSSStyleDeclaration.prototype.setProperty`/
  * `removeProperty` — that API is shared by every stylesheet rule's `.style`
@@ -32,12 +50,7 @@ import type { DisposeFn } from "./mutation-tree.js";
  * dom/layer-injector.ts), so patching it would need reentrancy-guarding
  * against retriggering on our own output, on a far hotter call path (every
  * inline style write on the page, not just new-rule insertion) than the
- * value justifies. `insertRule`/`deleteRule` alone covers the real-world
- * CSS-in-JS pattern (new class -> new rule) without that risk: Darkframe
- * itself never calls either on a real page stylesheet, only on a throwaway
- * detached sheet for feature detection (see layer-injector.ts's
- * supportsCascadeLayers), so there is no self-triggering loop to guard
- * against here.
+ * value justifies, on top of the cross-world limitation above.
  */
 export function observeStylesheetMutations(win: Window, onChange: () => void): DisposeFn {
   const ctor = (win as unknown as { CSSStyleSheet?: typeof CSSStyleSheet }).CSSStyleSheet;

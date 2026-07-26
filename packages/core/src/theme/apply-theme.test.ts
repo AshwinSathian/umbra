@@ -126,16 +126,24 @@ describe("applyTheme (@layer path, forced on to verify the additive/non-mutating
   });
 
   it("themes a class already present at initial render whose defining rule is inserted later via insertRule() (CSS-in-JS 'speedy' mode), with no other DOM mutation", async () => {
-    // Reproduces the confirmed root cause of MongoDB Atlas's cluster cards
-    // staying white under Darkframe: leafygreen-ui/Emotion's production
-    // "speedy" mode defines a class's rule via CSSStyleSheet.insertRule()
-    // rather than a DOM-visible <style> textContent write — invisible to
-    // the plain MutationObserver in dom/mutation-tree.ts. The element's
-    // class is already present from the very first render (as it would be
-    // for element structure that mounts before its styles finish
-    // computing), and — critically — nothing else on the page mutates
-    // afterward, isolating this from the (real, but not always available)
-    // incidental rescue via the image-scan/cross-origin-warm completion.
+    // Verifies the same-realm mechanics of dom/stylesheet-mutation-watch.ts:
+    // that inserting a rule via CSSStyleSheet.insertRule() — invisible to
+    // the plain MutationObserver in dom/mutation-tree.ts, since it's not a
+    // DOM-visible textContent write — correctly triggers a re-render when
+    // the call happens in the *same* JS realm as the watcher, with nothing
+    // else on the page mutating afterward.
+    //
+    // Important caveat this test does NOT cover (see the significant
+    // limitation documented at the top of stylesheet-mutation-watch.ts):
+    // in a real installed extension, this content script runs in an
+    // isolated world that does not share `CSSStyleSheet.prototype` with the
+    // page's own ("main world") scripts, so a real page's own
+    // Emotion/styled-components `insertRule` calls are currently *not*
+    // intercepted at all — confirmed directly against a real Chromium
+    // instance with the built extension, not assumed. This test and this
+    // module's own unit tests are exactly the same-realm case where the
+    // patch *does* work; they cannot exercise the cross-world gap, since
+    // vitest has no isolated/main-world distinction at all.
     //
     // Uses a constructible `new CSSStyleSheet()` adopted via
     // `document.adoptedStyleSheets` rather than a `<style>` element's
@@ -156,6 +164,14 @@ describe("applyTheme (@layer path, forced on to verify the additive/non-mutating
     expect(document.getElementById(MANAGED_STYLE_ID)?.textContent ?? "").not.toContain(".css-speedy");
 
     sheet.insertRule(".css-speedy { background-color: #ffffff; }", 0);
+    // Two ticks: the render-trigger scheduler now debounces via an outer
+    // setTimeout(0) (a macrotask) on top of stylesheet-mutation-watch's own
+    // microtask, specifically to reliably coalesce this signal with a
+    // same-tick DOM mutation from the other observer — see the
+    // "coalesces" doc comment in apply-theme.ts. One tick resolves the
+    // inner microtask; the second resolves the outer macrotask that
+    // actually calls render().
+    await tick();
     await tick();
 
     expect(document.getElementById(MANAGED_STYLE_ID)?.textContent).toContain(".css-speedy");
@@ -175,6 +191,7 @@ describe("applyTheme (@layer path, forced on to verify the additive/non-mutating
     expect(shadow.querySelectorAll(`#${MANAGED_STYLE_ID}`).length).toBe(1);
 
     shadowStyle.textContent = "";
+    await tick();
     await tick();
     expect(shadow.querySelectorAll(`#${MANAGED_STYLE_ID}`).length).toBe(0);
 

@@ -271,20 +271,6 @@ function resolveShorthandVarFallback(
 }
 
 /**
- * Memoized per-root `selectorText -> matched element's computed style`
- * lookup, used only to resolve `var()` references (see
- * resolveVarBackedValue) for stylesheet rules — inline styles already have
- * their own concrete element, so they skip this entirely. Scoped to a
- * single computeTheme() call (a fresh cache is created on every call, never
- * shared across renders): a custom property's resolved value can
- * legitimately change between renders (e.g. a page flipping a
- * `[data-theme]` attribute), and a fresh DOM/CSSOM snapshot is read on
- * every render regardless, so nothing would be gained by caching longer —
- * only correctness would be risked. Scoped *per root* (not globally) since
- * the same selector text can exist in unrelated shadow roots matching
- * different elements with different resolved custom-property values.
- */
-/**
  * Matches CSS interaction pseudo-classes that are only ever true for the
  * fleeting moment a user is actually hovering/focusing/activating an
  * element — never during an ordinary render pass. `document.querySelector`
@@ -315,17 +301,71 @@ function resolveShorthandVarFallback(
  */
 const INTERACTION_PSEUDO_CLASS_PATTERN = /:(?:hover|focus(?:-visible|-within)?|active|visited)\b/g;
 
-function createComputedStyleResolver(fallbackWindow: Window | null) {
-  const cache = new WeakMap<Document | ShadowRoot, Map<string, CSSStyleDeclaration | null>>();
-  return function resolve(root: Document | ShadowRoot, selectorText: string): CSSStyleDeclaration | null {
-    let forRoot = cache.get(root);
+/**
+ * Memoized per-root `selectorText -> matched element's computed style`
+ * lookup, used only to resolve `var()` references (see
+ * resolveVarBackedValue) for stylesheet rules — inline styles already have
+ * their own concrete element, so they skip this entirely.
+ *
+ * Persisted *across* renders (owned by apply-theme.ts, same lifecycle as
+ * OriginalValueCache/ImageAnalysisCache) rather than recreated fresh on
+ * every computeTheme() call, which is load-bearing for performance, not
+ * just a nice-to-have: on a content-heavy page (confirmed via a real-
+ * Chromium repro simulating an infinite-scroll job-listing SPA), every
+ * mutation-triggered render used to re-run `querySelector` +
+ * `getComputedStyle` — a forced synchronous layout — for *every*
+ * `var()`-backed rule in the stylesheet, every single time, even though
+ * the overwhelming majority of those selectors and their resolved custom-
+ * property values hadn't changed at all since the previous render (a page
+ * loading more list items doesn't change what `--card-bg` resolves to).
+ * That scaled with total page size per render, compounding into real,
+ * measured jank (hundreds of milliseconds of forced-layout work across a
+ * short scroll session) — see PLAN-darkframe.md.
+ *
+ * Safe to persist because `getComputedStyle()`'s return value is *live* —
+ * confirmed empirically, not assumed: reading a property on a
+ * previously-obtained `CSSStyleDeclaration` reference reflects the
+ * *current* value, even if the underlying custom property changed after
+ * the reference was obtained (e.g. a page toggling its own
+ * `[data-theme]` attribute). So caching the reference across renders never
+ * risks a stale *value* the way caching a resolved string would. The one
+ * real risk is the matched element itself being removed from the DOM
+ * (list virtualization is the realistic case) — `resolve()` checks
+ * `isConnected` and re-queries when the cached element is gone, so a
+ * detached reference (whose computed style silently reverts to initial
+ * values once disconnected) never gets reused. Scoped *per root* (not
+ * globally) since the same selector text can exist in unrelated shadow
+ * roots matching different elements with different resolved
+ * custom-property values.
+ */
+export class VarResolutionCache {
+  private byRoot = new WeakMap<Document | ShadowRoot, Map<string, { element: Element; style: CSSStyleDeclaration }>>();
+
+  resolve(root: Document | ShadowRoot, selectorText: string, fallbackWindow: Window | null): CSSStyleDeclaration | null {
+    let forRoot = this.byRoot.get(root);
     if (!forRoot) {
       forRoot = new Map();
-      cache.set(root, forRoot);
+      this.byRoot.set(root, forRoot);
     }
-    if (forRoot.has(selectorText)) return forRoot.get(selectorText)!;
 
-    let result: CSSStyleDeclaration | null = null;
+    // Only a *positive* match (still connected) is safe to reuse. A
+    // "nothing matched" result must NOT be cached — confirmed as a real
+    // bug found while verifying this fix: content-heavy pages routinely
+    // define a class's CSS before that class's element ever exists in the
+    // DOM (e.g. a shared stylesheet loaded once, content streamed in via
+    // infinite scroll), so a selector that matches nothing on the *first*
+    // render may very well match something on a later one. Caching "no
+    // match" as permanent would silently and permanently break theming for
+    // any such selector the instant it was first checked too early —
+    // reproduced directly: a var()-backed class whose defining rule existed
+    // before its element did stayed unthemed forever once this cache
+    // treated the initial "nothing matched yet" as a settled answer.
+    const cached = forRoot.get(selectorText);
+    if (cached && cached.element.isConnected) {
+      return cached.style;
+    }
+
+    let entry: { element: Element; style: CSSStyleDeclaration } | null = null;
     const win = ("defaultView" in root ? root.defaultView : root.ownerDocument?.defaultView) ?? fallbackWindow;
     if (win) {
       try {
@@ -334,16 +374,27 @@ function createComputedStyleResolver(fallbackWindow: Window | null) {
           const resting = selectorText.replace(INTERACTION_PSEUDO_CLASS_PATTERN, "");
           if (resting !== selectorText && resting.trim()) matched = root.querySelector(resting);
         }
-        if (matched) result = win.getComputedStyle(matched);
+        if (matched) {
+          entry = { element: matched, style: win.getComputedStyle(matched) };
+        }
       } catch {
         // Invalid/unsupported selector syntax (rare — e.g. a vendor-
         // specific pseudo-element) — leave unresolved, same as before this
-        // function existed.
+        // class existed.
       }
     }
-    forRoot.set(selectorText, result);
-    return result;
-  };
+    // Retrying `querySelector` on every render for a selector that never
+    // matches anything (a real cost on a huge shared CSS bundle where many
+    // classes genuinely don't apply to the current page) is still far
+    // cheaper than the `getComputedStyle` call this cache exists to avoid:
+    // selector matching is a structural DOM-tree query with no dependency
+    // on computed style/layout, unlike `getComputedStyle`, which forces a
+    // synchronous style recalculation. So only caching positive matches
+    // keeps the actually-expensive part of this bounded, without ever
+    // risking a selector getting silently and permanently stuck unthemed.
+    if (entry) forRoot.set(selectorText, entry);
+    return entry?.style ?? null;
+  }
 }
 
 /**
@@ -361,13 +412,14 @@ export function computeTheme(
   doc: Document,
   settings: ThemeSettings = DEFAULT_THEME_SETTINGS,
   resolveOriginalValue: OriginalValueResolver = defaultResolveOriginalValue,
+  varResolutionCache: VarResolutionCache = new VarResolutionCache(),
 ): ThemeResult {
   const nativeDark = detectNativeDark(doc);
   if (nativeDark.isNativeDark) {
     return { isNativeDark: true, overridesByRoot: new Map(), directRewrites: [], inlineRewrites: [] };
   }
 
-  const resolveComputedStyleForSelector = createComputedStyleResolver(doc.defaultView);
+  const fallbackWindow = doc.defaultView;
 
   // A representative neutral dark background, used only as the contrast
   // backstop's comparison point (see ensureForegroundContrast) — not as
@@ -404,7 +456,7 @@ export function computeTheme(
         if (!raw) raw = resolveShorthandVarFallback(resolveOriginalValue, rule.style, property);
         if (!raw) continue;
         if (raw.includes("var(")) {
-          const computed = resolveComputedStyleForSelector(discovered.root, rule.selectorText);
+          const computed = varResolutionCache.resolve(discovered.root, rule.selectorText, fallbackWindow);
           raw = resolveVarBackedValue(raw, computed);
         }
 
