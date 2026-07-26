@@ -69,6 +69,24 @@ All notable changes to this project are documented in this file. The format is b
   `MutationObserver`-based change detection, so a class defined this way after a page's
   initial load — common on long-lived SPA sessions — was never themed. Now also observed via
   `dom/stylesheet-mutation-watch.ts`.
+- A `var(--token)` reference gated behind `:hover`/`:focus`/`:focus-visible`/`:focus-within`/
+  `:active`/`:visited` was never resolved — reported live on npmjs.com's account menu, where
+  the hover/focus highlight stayed at its original light color inside an otherwise
+  dark-recolored dropdown. `document.querySelector` can only match a selector containing one
+  of these while that state is truly, momentarily live (or, for `:visited`, never at all —
+  browsers deliberately hide it from scripts as a history-sniffing defense), which
+  essentially never coincides with a render pass. The resolver now also tries the same
+  selector with these pseudo-classes stripped out, since a custom property's value doesn't
+  differ based on whether *this* rule's own interaction state happens to be active.
+- A `var(--token)` reference declared through a shorthand whose entire value is that one
+  reference (`background: var(--surface)`, `outline: var(--x)`) was also never resolved,
+  independently of the fix above: a shorthand containing an unresolved `var()` anywhere in it
+  becomes a "pending-substitution value" per the CSS spec, so its longhand sub-properties
+  (`background-color`, `outline-color`) read back as genuinely empty via CSSOM — not just
+  falling through the var() check, invisible before reaching it at all. Only resolved when
+  the shorthand's entire value is the one reference (unambiguous); a shorthand with other
+  content alongside it (`border: 1px solid var(--x)`) is deliberately left untouched rather
+  than guess which sub-property the reference was meant for.
 
 ### Known gaps (tracked, not silently dropped)
 

@@ -164,6 +164,92 @@ describe("computeTheme", () => {
     expect(recolored.b).toBeLessThan(0.3);
   });
 
+  it("resolves a var()-backed :hover/:focus rule via the element's resting (non-hovered/focused) state", () => {
+    // Reproduces a second real bug found on npmjs.com's account dropdown menu
+    // (found while re-verifying the MongoDB fix on another site): npm's
+    // `._9e2bd439 a:hover, ._9e2bd439 a:focus { background-color: var(--color-bg-inset); }`
+    // gates a design-token background behind an interaction pseudo-class.
+    // `document.querySelector` only matches `:hover`/`:focus` while that
+    // state is truly, momentarily live — essentially never during a render
+    // pass — so without stripping it, this resolves to nothing on every
+    // real render, and the hover/focus highlight is left at the page's
+    // original light color sitting inside an otherwise dark-recolored menu
+    // (confirmed against a real Chromium instance actually hovering the
+    // element, not just this unit test — see PLAN-darkframe.md). happy-dom
+    // never reports any element as genuinely `:hover`/`:focus`-matched
+    // either, so this test exercises the exact same "selector doesn't
+    // match live" condition without needing to simulate real interaction.
+    // Custom property declared on the same resting-state selector the
+    // stripped fallback will match (rather than :root) — see the happy-dom
+    // inheritance-gap note on the var()-resolution tests above.
+    const style = document.createElement("style");
+    style.textContent =
+      ".item a { --hover-bg: #f2f2f2; } .item a:hover, .item a:focus { background-color: var(--hover-bg); }";
+    document.head.appendChild(style);
+    const link = document.createElement("a");
+    const item = document.createElement("li");
+    item.className = "item";
+    item.appendChild(link);
+    document.body.appendChild(item);
+
+    const result = computeTheme(document);
+    const rewrite = result.directRewrites.find((r) => r.property === "background-color");
+    expect(rewrite).toBeDefined();
+    const recolored = parseCssColor(rewrite!.value)!;
+    expect(recolored.r).toBeLessThan(0.3);
+  });
+
+  it("resolves a var() reference declared through a shorthand whose ENTIRE value is that one reference (e.g. background: var(--x))", () => {
+    // Confirmed empirically against real Chromium (not assumed): when a
+    // shorthand contains an unresolved var() anywhere in it, its longhand
+    // sub-properties read back as "" via CSSOM (a spec-mandated
+    // "pending-substitution value" — a literal `border: 1px solid red`
+    // splits into longhands completely normally; only a var()-containing
+    // shorthand doesn't), so `background: var(--x)` was invisible to the
+    // engine even after the var()-resolution fix above, entirely separate
+    // from that fix. Only safe to resolve when the shorthand's whole value
+    // is nothing but the one reference — see resolveShorthandVarFallback's
+    // doc comment for why that's unambiguous.
+    const style = document.createElement("style");
+    style.textContent = ".surface { --surface-bg: #ffffff; background: var(--surface-bg); }";
+    document.head.appendChild(style);
+    const el = document.createElement("div");
+    el.className = "surface";
+    document.body.appendChild(el);
+
+    const result = computeTheme(document);
+    const rewrite = result.directRewrites.find((r) => r.property === "background-color");
+    expect(rewrite).toBeDefined();
+    const recolored = parseCssColor(rewrite!.value)!;
+    expect(recolored.r).toBeLessThan(0.3);
+  });
+
+  it("does NOT guess a color out of an ambiguous shorthand (border: 1px solid var(--x)) — leaves it untouched rather than risk misattributing the reference", () => {
+    // Real Chromium's CSSOM behavior for a multi-token var()-containing
+    // shorthand isn't reliably reproducible in happy-dom (confirmed
+    // experimentally — happy-dom over-eagerly expands it into longhands,
+    // unlike real Chromium's spec-accurate "" result), so this drives
+    // computeTheme's injectable resolver directly to exercise exactly the
+    // condition that matters: the longhand is empty, and the shorthand's
+    // raw value has *other* content besides the var() reference. The width
+    // and style tokens mean the reference could resolve to any of the
+    // border sub-properties, not necessarily a color — resolving it as if
+    // it were border-color would risk being flatly wrong, so the engine
+    // must leave it alone instead of guessing.
+    const style = document.createElement("style");
+    style.textContent = ".card { border: 1px solid red; }";
+    document.head.appendChild(style);
+
+    const resolve = (cssStyle: CSSStyleDeclaration, property: string) => {
+      if (property === "border-color") return "";
+      if (property === "border") return "1px solid var(--line)";
+      return cssStyle.getPropertyValue(property);
+    };
+
+    const result = computeTheme(document, undefined, resolve);
+    expect(result.directRewrites.some((r) => r.property === "border-color")).toBe(false);
+  });
+
   it("leaves a var()-backed declaration untouched (not crashing) when no element currently matches the selector", () => {
     const style = document.createElement("style");
     style.textContent = ":root { --card-bg: #ffffff; } .not-on-page { background-color: var(--card-bg); }";

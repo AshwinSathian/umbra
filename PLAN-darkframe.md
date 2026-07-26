@@ -430,6 +430,77 @@ Both fixes were verified against the real built extension in real Chromium via a
 Playwright repro harness before committing to a diagnosis, then covered by proper unit/
 integration tests as the durable regression guard.
 
+### Follow-up: `:hover`/`:focus`-scoped `var()` references (found while re-verifying, on npmjs.com)
+
+While re-verifying the fix above against a second real, unrelated site (npmjs.com's account
+dropdown menu), a distinct third bug surfaced: the "Profile"/"Packages" menu items rendered
+with a washed-out, low-contrast look under mouse hover / keyboard focus, unlike their
+siblings. Diagnosed by fetching npm's actual production CSS bundle directly (a public static
+asset, unauthenticated — no login needed) and grepping it for the classes visible in the
+Elements panel, rather than guessing: npm ships a complete native dark-mode design-token
+system (`--color-bg-inset: #f2f2f2` light / `#2d2d2d` dark, gated by `[data-color-mode="dark"]`
+on `<html>`, manually toggled — not automatic — so it stays at its light value while
+Darkframe is doing the theming instead), and the specific rule responsible was
+`._9e2bd439 a:hover, ._9e2bd439 a:focus { background-color: var(--color-bg-inset); }`.
+
+**Root cause**: the `var()` fix above resolves a custom property by finding a representative
+element via `root.querySelector(rule.selectorText)` — but `:hover`/`:focus`/`:active` are only
+ever *true* for the fleeting real moment a user is actually interacting with an element, which
+essentially never coincides with the microtask a render pass happens to run in. So a rule
+gated behind one of these pseudo-classes almost never found a match, the `var()` was never
+resolved, and the hover/focus highlight was left showing the page's *original* light color
+sitting inside an otherwise dark-recolored menu — precisely the washed-out box in the
+screenshot. Confirmed directly: hovering the element in a real Chromium instance with the
+built extension active showed the highlight still at npm's literal `rgb(242, 242, 242)`.
+
+**Fix**: `theme/theme-engine.ts`'s selector-to-computed-style resolver now falls back to the
+same selector with `:hover`/`:focus`/`:focus-visible`/`:focus-within`/`:active` stripped out,
+if the original (with the pseudo-class) doesn't currently match anything — a custom
+property's value essentially never differs based on whether *this particular* rule's own
+interaction state is active; it's a design token defined once elsewhere and just referenced
+here for one state. Re-verified against the real built extension in real Chromium: both an
+actual `page.hover()` and a real `page.focus()` on the reproduction element now correctly show
+the dark-recolored background, and the `currentColor`-based focus outline correctly follows
+the recolored text color with no special-casing needed. Covered by a unit test in
+`theme-engine.test.ts` exercising the identical "selector with a pseudo-class never truly
+matches in happy-dom either" condition.
+
+**Extended while self-auditing the fix for narrowness** (rather than stopping at the one
+confirmed case) in two ways:
+
+- Added `:visited` to the same stripped-pseudo-class list, for a different reason than the
+  others: browsers deliberately lie about `:visited` to scripts as a history-sniffing defense
+  (confirmed — `document.querySelector("a:visited")` returns null even for a genuinely visited
+  link), so it has the identical "never matches via querySelector regardless of real state"
+  failure shape, just for privacy rather than timing. Deliberately did *not* add
+  `:checked`/`:disabled`/`:required`/`:invalid`/`:target`/etc. — those genuinely reflect
+  queryable DOM state with no such restriction, so the plain (non-stripped) selector already
+  matches correctly whenever true; stripping them would only lose specificity for no benefit.
+- Found (via the same "does this generalize or was it a lucky fit for the one bug I saw"
+  question) a **second, independent gap in the `var()` fix itself**: when a `var()` reference
+  is embedded in a *shorthand* property (`background: var(--surface)`, not
+  `background-color: var(--surface)`), the color longhand's own CSSOM value reads back as
+  `""` — not just absent, genuinely empty — because per the CSS spec, a shorthand containing
+  *any* unresolved `var()` becomes a "pending-substitution value" that cannot be split into
+  longhands until resolved (a literal `border: 1px solid red` splits into longhands
+  completely normally; only a var()-containing shorthand doesn't). Confirmed against real
+  Chromium for both stylesheet rules and inline styles, independently of the MongoDB/npm
+  bugs — a real, generalizable gap, not a hypothetical. **Fix**: `resolveShorthandVarFallback`
+  falls back to the corresponding shorthand's raw value, but *only* treats it as resolvable
+  when the shorthand's entire value is nothing but the one `var()` reference (e.g.
+  `background: var(--x)`, `outline: var(--x)`) — that case is unambiguous, since a bare color
+  value assigned to a shorthand sets that shorthand's color sub-property and resets everything
+  else to initial. A shorthand with *other* content alongside the reference
+  (`border: 1px solid var(--x)`) is deliberately left untouched rather than guess which
+  sub-property (width, style, or color) the reference was meant for — verified directly
+  against real Chromium that this ambiguous case is correctly left at its original color,
+  width, and style, unmodified, alongside confirming the unambiguous `background`/`outline`
+  cases do get themed. Covered by two unit tests: one exercising the resolvable case through
+  `computeTheme` normally, and one driving `computeTheme`'s injectable value resolver directly
+  for the ambiguous case (real Chromium's spec-accurate "pending-substitution" behavior isn't
+  reproducible in happy-dom, which over-eagerly expands it — confirmed experimentally — so the
+  test targets the resulting condition directly rather than fighting the test environment).
+
 ## 🧪 Testing Strategy
 
 - **Unit tests (Vitest)**: `packages/core/color` (OKLCH round-trip, gamut mapping, contrast solver — property-based + fixed-case tests), `packages/core/image` (classifier decision table against synthetic fixtures), `packages/core/dom` (style discovery against jsdom/happy-dom fixtures, injector mutation-free guarantee). Target ≥ 90% line coverage on `packages/core`.

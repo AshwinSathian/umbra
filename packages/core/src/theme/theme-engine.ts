@@ -48,6 +48,24 @@ const FOREGROUND_PROPERTIES = ["color", "text-decoration-color", "caret-color"] 
 
 const ALL_THEMED_PROPERTIES: readonly string[] = [...BACKGROUND_PROPERTIES, ...FOREGROUND_PROPERTIES];
 
+/**
+ * Maps each color longhand to the shorthand that can also carry it (`color`
+ * and `caret-color` have no shorthand form, so they're absent). Used only
+ * as a fallback when the longhand's own CSSOM value is empty — see
+ * `resolveShorthandVarFallback` below for why that happens and why the
+ * fallback is safe.
+ */
+const SHORTHAND_FOR_PROPERTY: Partial<Record<string, string>> = {
+  "background-color": "background",
+  "border-color": "border",
+  "border-top-color": "border-top",
+  "border-right-color": "border-right",
+  "border-bottom-color": "border-bottom",
+  "border-left-color": "border-left",
+  "outline-color": "outline",
+  "text-decoration-color": "text-decoration",
+};
+
 const TRANSPARENT_ALPHA_THRESHOLD = 0.02;
 const NO_OP_CHANNEL_EPSILON = 1 / 255;
 
@@ -207,6 +225,52 @@ function resolveVarBackedValue(raw: string, computed: CSSStyleDeclaration | null
 }
 
 /**
+ * Reads a color longhand's value the way `computeTheme`'s two passes
+ * already do, falling back to its shorthand (`background-color` ->
+ * `background`, `border-color` -> `border`, etc. — see
+ * SHORTHAND_FOR_PROPERTY) when the longhand itself is empty.
+ *
+ * The longhand comes back empty — not just absent, genuinely empty even
+ * though the color is visibly set — whenever the shorthand contains an
+ * unresolved `var()` reference anywhere in it: per the CSS spec, a
+ * shorthand with a `var()` in any of its sub-values becomes a "pending-
+ * substitution value" that cannot be split into longhands until the
+ * variable is resolved, so `style.getPropertyValue("border-color")`
+ * returns `""` for a rule declared as `border: 1px solid var(--x)`, even
+ * though a literal `border: 1px solid red` splits into longhands
+ * completely normally. Confirmed empirically against real Chromium (not
+ * assumed) for both stylesheet rules and inline styles — this is a
+ * genuine engine-wide gap independent of the `var()`-resolution fix above,
+ * not a hypothetical.
+ *
+ * Only treated as a match when the shorthand's *entire* value is a single
+ * `var(--name[, fallback])` reference (reusing SIMPLE_VAR_PATTERN) — e.g.
+ * `background: var(--surface)`. That is unambiguous: a bare color value
+ * assigned to a shorthand sets that shorthand's color sub-property and
+ * resets every other sub-property to its initial value, so there is only
+ * one thing the reference could mean. `border: 1px solid var(--x)` does
+ * NOT match (there's other content in the shorthand besides the var()), so
+ * it deliberately falls through unresolved rather than guess which
+ * sub-property the reference was meant for — misattributing it (e.g.
+ * treating a border-*width* token as a color) would be worse than leaving
+ * it untouched. Even in the case that does match, if the resolved custom
+ * property turns out not to be a real color (e.g. someone really did
+ * write a bare `--token: 2px dashed red` design token), `parseCssColor`
+ * downstream simply returns null and the declaration is left alone — the
+ * failure mode is "unrecolored", never "recolored wrong".
+ */
+function resolveShorthandVarFallback(
+  resolveOriginalValue: OriginalValueResolver,
+  style: CSSStyleDeclaration,
+  property: string,
+): string {
+  const shorthand = SHORTHAND_FOR_PROPERTY[property];
+  if (!shorthand) return "";
+  const shorthandRaw = resolveOriginalValue(style, shorthand).trim();
+  return SIMPLE_VAR_PATTERN.test(shorthandRaw) ? shorthandRaw : "";
+}
+
+/**
  * Memoized per-root `selectorText -> matched element's computed style`
  * lookup, used only to resolve `var()` references (see
  * resolveVarBackedValue) for stylesheet rules — inline styles already have
@@ -220,6 +284,37 @@ function resolveVarBackedValue(raw: string, computed: CSSStyleDeclaration | null
  * the same selector text can exist in unrelated shadow roots matching
  * different elements with different resolved custom-property values.
  */
+/**
+ * Matches CSS interaction pseudo-classes that are only ever true for the
+ * fleeting moment a user is actually hovering/focusing/activating an
+ * element — never during an ordinary render pass. `document.querySelector`
+ * happily accepts a selector containing one of these (it's valid CSS), but
+ * it can only ever return a match if that transient state is true *right
+ * now*, at the exact microtask a render happens to run. In practice that
+ * essentially never coincides, so a rule like
+ * `a:hover, a:focus { background-color: var(--x); }` — confirmed for real
+ * on npmjs.com's account menu, gating `var(--color-bg-inset)` — almost
+ * never resolves, leaving the hover/focus highlight at the page's original
+ * (light) color sitting inside an otherwise dark-recolored menu. Stripped
+ * out as a fallback match target below, since a custom property's value
+ * essentially never differs based on whether *this* rule's own pseudo-class
+ * is active — it's a design token defined once elsewhere, just referenced
+ * here for one particular state.
+ *
+ * `:visited` is included for a different reason, not transience: browsers
+ * deliberately lie about it to scripts as a history-sniffing defense
+ * (confirmed — `document.querySelector("a:visited")` returns null even for
+ * an actually-visited link), so it has the identical "never matches via
+ * querySelector regardless of real state" failure shape as the interaction
+ * pseudo-classes above, just for a privacy reason instead of a timing one.
+ * Deliberately excludes state pseudo-classes that genuinely do reflect
+ * queryable DOM state with no such restriction — `:checked`, `:disabled`,
+ * `:required`, `:invalid`, `:target`, etc. — since for those, the ordinary
+ * (non-stripped) selector already matches correctly whenever the state is
+ * true, so stripping them would only reduce specificity for no benefit.
+ */
+const INTERACTION_PSEUDO_CLASS_PATTERN = /:(?:hover|focus(?:-visible|-within)?|active|visited)\b/g;
+
 function createComputedStyleResolver(fallbackWindow: Window | null) {
   const cache = new WeakMap<Document | ShadowRoot, Map<string, CSSStyleDeclaration | null>>();
   return function resolve(root: Document | ShadowRoot, selectorText: string): CSSStyleDeclaration | null {
@@ -234,7 +329,11 @@ function createComputedStyleResolver(fallbackWindow: Window | null) {
     const win = ("defaultView" in root ? root.defaultView : root.ownerDocument?.defaultView) ?? fallbackWindow;
     if (win) {
       try {
-        const matched = root.querySelector(selectorText);
+        let matched = root.querySelector(selectorText);
+        if (!matched) {
+          const resting = selectorText.replace(INTERACTION_PSEUDO_CLASS_PATTERN, "");
+          if (resting !== selectorText && resting.trim()) matched = root.querySelector(resting);
+        }
         if (matched) result = win.getComputedStyle(matched);
       } catch {
         // Invalid/unsupported selector syntax (rare — e.g. a vendor-
@@ -302,6 +401,7 @@ export function computeTheme(
 
       for (const property of ALL_THEMED_PROPERTIES) {
         let raw = resolveOriginalValue(rule.style, property);
+        if (!raw) raw = resolveShorthandVarFallback(resolveOriginalValue, rule.style, property);
         if (!raw) continue;
         if (raw.includes("var(")) {
           const computed = resolveComputedStyleForSelector(discovered.root, rule.selectorText);
@@ -334,6 +434,7 @@ export function computeTheme(
     const elWindow = el.ownerDocument.defaultView ?? doc.defaultView;
     for (const property of ALL_THEMED_PROPERTIES) {
       let raw = resolveOriginalValue(el.style, property);
+      if (!raw) raw = resolveShorthandVarFallback(resolveOriginalValue, el.style, property);
       if (!raw) continue;
       if (raw.includes("var(") && elWindow) {
         raw = resolveVarBackedValue(raw, elWindow.getComputedStyle(el));
