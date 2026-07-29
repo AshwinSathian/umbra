@@ -17,7 +17,7 @@ describe("observeMutations", () => {
 
   it("collapses a synchronous burst of 50 new elements into exactly one callback", async () => {
     const onChange = vi.fn();
-    const dispose = observeMutations(document, onChange);
+    const { dispose } = observeMutations(document, onChange);
 
     for (let i = 0; i < 50; i++) {
       const style = document.createElement("style");
@@ -30,28 +30,32 @@ describe("observeMutations", () => {
     dispose();
   });
 
-  it("ignores mutations that are solely Darkframe's own managed style element", async () => {
+  it("does not fire for a managed-style write made inside withoutObserving", async () => {
     const onChange = vi.fn();
-    const dispose = observeMutations(document, onChange);
+    const { dispose, withoutObserving } = observeMutations(document, onChange);
 
-    const managed = document.createElement("style");
-    managed.id = MANAGED_STYLE_ID;
-    managed.setAttribute("data-darkframe-managed", "true");
-    document.head.appendChild(managed);
-    managed.textContent = "@layer darkframe { a { color: red !important; } }";
+    withoutObserving(() => {
+      const managed = document.createElement("style");
+      managed.id = MANAGED_STYLE_ID;
+      managed.setAttribute("data-darkframe-managed", "true");
+      document.head.appendChild(managed);
+      managed.textContent = "@layer darkframe { a { color: red !important; } }";
+    });
 
     await flushMicrotasks();
     expect(onChange).not.toHaveBeenCalled();
     dispose();
   });
 
-  it("still fires when a real page mutation happens alongside a managed-element mutation", async () => {
+  it("still fires when a real page mutation happens alongside a withoutObserving-bracketed write", async () => {
     const onChange = vi.fn();
-    const dispose = observeMutations(document, onChange);
+    const { dispose, withoutObserving } = observeMutations(document, onChange);
 
-    const managed = document.createElement("style");
-    managed.id = MANAGED_STYLE_ID;
-    document.head.appendChild(managed);
+    withoutObserving(() => {
+      const managed = document.createElement("style");
+      managed.id = MANAGED_STYLE_ID;
+      document.head.appendChild(managed);
+    });
 
     const pageStyle = document.createElement("style");
     pageStyle.textContent = "a { color: blue; }";
@@ -62,9 +66,37 @@ describe("observeMutations", () => {
     dispose();
   });
 
+  it("REGRESSION: notices and can react to a third party removing the managed style element outside withoutObserving", async () => {
+    // The bug this guards against: Darkframe used to decide a mutation batch
+    // was "self-inflicted" purely by checking whether the touched node
+    // carried its own managed-style id — which is indistinguishable from a
+    // third party (e.g. another extension's own shadow-DOM UI reconciling
+    // itself, confirmed in practice with Grammarly) removing that same node
+    // as a side effect of unrelated work. That removal was silently
+    // swallowed and Darkframe never learned its style had been erased.
+    const onChange = vi.fn();
+    const { dispose, withoutObserving } = observeMutations(document, onChange);
+
+    withoutObserving(() => {
+      const managed = document.createElement("style");
+      managed.id = MANAGED_STYLE_ID;
+      managed.setAttribute("data-darkframe-managed", "true");
+      document.head.appendChild(managed);
+    });
+    onChange.mockClear();
+
+    // A third party removes it — *not* bracketed by withoutObserving, since
+    // Darkframe didn't do this.
+    document.getElementById(MANAGED_STYLE_ID)!.remove();
+
+    await flushMicrotasks();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    dispose();
+  });
+
   it("detects and observes a shadow root created after observation started", async () => {
     const onChange = vi.fn();
-    const dispose = observeMutations(document, onChange);
+    const { dispose } = observeMutations(document, onChange);
 
     const host = document.createElement("div");
     document.body.appendChild(host);
@@ -83,7 +115,7 @@ describe("observeMutations", () => {
 
   it("stops calling back after dispose", async () => {
     const onChange = vi.fn();
-    const dispose = observeMutations(document, onChange);
+    const { dispose } = observeMutations(document, onChange);
     dispose();
 
     const style = document.createElement("style");
@@ -102,7 +134,7 @@ describe("observeMutations", () => {
     // change restart), clobbering the new instance's correct output with
     // stale (old-settings) values.
     const onChange = vi.fn();
-    const dispose = observeMutations(document, onChange);
+    const { dispose } = observeMutations(document, onChange);
 
     const style = document.createElement("style");
     document.head.appendChild(style); // schedules the observer callback

@@ -94,6 +94,43 @@ describe("applyTheme (@layer path, forced on to verify the additive/non-mutating
     expect(document.querySelectorAll(`#${MANAGED_STYLE_ID}`).length).toBe(0);
   });
 
+  it("REGRESSION: re-applies the theme after a third party removes the managed stylesheet, instead of staying light forever", async () => {
+    // Root cause of a real reported bug: when the Grammarly browser
+    // extension is active, Darkframe could get stuck in light mode. Grammarly
+    // injects its own UI into an *open* shadow root, which Darkframe (by
+    // design) also themes — and that UI fully owns and re-renders its own
+    // shadow DOM on nearly every keystroke, discarding any child element it
+    // doesn't recognize, including Darkframe's managed `<style>`. The old
+    // "self-inflicted" filter decided whether to ignore a mutation purely by
+    // checking whether the touched node carried Darkframe's own managed-style
+    // id — which can't tell "Darkframe just wrote this" apart from "a third
+    // party just erased what Darkframe previously wrote". That removal was
+    // silently swallowed, and because nothing else was mutating the page at
+    // that moment, the theme never came back. This test simulates that
+    // removal directly (independent of Grammarly specifically — any third
+    // party doing the same thing would trigger the identical failure) and
+    // asserts the fix: an external removal is a real, observed mutation that
+    // triggers a re-render, which simply re-creates the missing element.
+    const style = document.createElement("style");
+    style.textContent = "body { background-color: #ffffff; }";
+    document.head.appendChild(style);
+
+    const dispose = applyTheme(document, window, { forceLayerSupport: true });
+    await tick();
+    expect(document.getElementById(MANAGED_STYLE_ID)).not.toBeNull();
+
+    // Not Darkframe's own write — nothing brackets this with
+    // withoutObserving, exactly like a third party's own DOM manipulation.
+    document.getElementById(MANAGED_STYLE_ID)!.remove();
+    await tick();
+    await tick();
+
+    expect(document.getElementById(MANAGED_STYLE_ID)).not.toBeNull();
+    expect(document.getElementById(MANAGED_STYLE_ID)?.textContent).toContain("!important");
+
+    dispose();
+  });
+
   it("merges in image overrides from an async sampler once the scan resolves, without blocking the initial color render", async () => {
     const img = document.createElement("img");
     img.src = "https://example.com/icon.png";

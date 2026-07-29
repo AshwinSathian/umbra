@@ -118,6 +118,26 @@ All notable changes to this project are documented in this file. The format is b
   positive matches — a "no match" always retries fresh next render, which is safe to redo
   unconditionally since selector matching (unlike `getComputedStyle`) doesn't force a style
   recalculation.
+- Darkframe could get permanently stuck in light mode on a page with the Grammarly browser
+  extension active — reported live. Root-caused to `dom/mutation-tree.ts`'s "self-inflicted"
+  filter, which decided whether to ignore a `MutationObserver` batch purely by checking whether
+  every touched node carried Darkframe's own managed-style id — on the assumption that only
+  Darkframe's own write could ever produce such a batch. That assumption breaks the moment a
+  third party removes or replaces that same node as an incidental side effect of *its own*
+  unrelated work: Grammarly injects its UI into an *open* shadow root, which Darkframe, by
+  design, also themes by inserting a managed `<style>` into it, and Grammarly's shadow-DOM UI
+  fully owns and re-renders its own subtree on nearly every keystroke, discarding any child it
+  doesn't recognize — including Darkframe's style. Matched purely by node identity, that
+  removal was indistinguishable from Darkframe's own write, so it was silently swallowed and
+  never triggered a re-render; once it hit the top-level managed stylesheet with no other page
+  mutation following to accidentally trigger recovery, the whole page stayed light for good.
+  **Fix**: replaced the identity-based heuristic with `MutationWatcher.withoutObserving()` —
+  Darkframe's own writes now happen with the observer disconnected, so they never produce a
+  mutation record in the first place, and *any* external removal (Grammarly's or otherwise) is
+  once again a real, observed mutation that triggers a re-render, which simply re-creates the
+  missing element. Verified against the real, installed Grammarly extension in a live Chromium
+  instance via Playwright, and with a deterministic regression test (`apply-theme.test.ts`)
+  simulating a lone third-party removal.
 
 ### Known gaps (tracked, not silently dropped)
 

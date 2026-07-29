@@ -10,7 +10,7 @@ import {
   supportsCascadeLayers,
 } from "../dom/layer-injector.js";
 import { InlineRewriteTracker } from "../dom/inline-rewrite-tracker.js";
-import { type DisposeFn, observeMutations } from "../dom/mutation-tree.js";
+import { type DisposeFn, type MutationWatcher, observeMutations } from "../dom/mutation-tree.js";
 import { OriginalValueCache } from "../dom/original-value-cache.js";
 import { observeStylesheetMutations } from "../dom/stylesheet-mutation-watch.js";
 import type { ImageSampler } from "../image/image-theme.js";
@@ -87,6 +87,16 @@ export function applyTheme(
   let imageScanInFlight = false;
   let crossOriginScanInFlight = false;
   let disposed = false;
+  // Set once the mutation watcher exists (after the very first render —
+  // see the bottom of this function). Every render from then on brackets
+  // its own DOM writes with this, so they never produce a mutation record
+  // in the first place — see mutation-tree.ts's doc comment for why that
+  // is load-bearing, not an optimization: without it, a third party (e.g.
+  // Grammarly's own shadow-DOM UI reconciling itself) erasing Darkframe's
+  // managed style as an incidental side effect of unrelated work was
+  // indistinguishable from Darkframe's own write, so it went unnoticed and
+  // was never re-applied.
+  let watcher: MutationWatcher | null = null;
 
   function renderLayerPath(overridesByRoot: ReturnType<typeof computeTheme>["overridesByRoot"]) {
     const nextRoots = new Set(overridesByRoot.keys());
@@ -173,26 +183,34 @@ export function applyTheme(
       varResolutionCache,
     );
 
-    if (result.isNativeDark) {
-      renderLayerPath(new Map());
-      revertDirectRewrites(directRewriteEntries);
-      directRewriteEntries = [];
-      inlineTracker.revertAll();
-      return;
-    }
-
-    if (useLayers) {
-      const docOverrides = result.overridesByRoot.get(doc) ?? [];
-      const merged = new Map(result.overridesByRoot);
-      if (latestImageOverrides.length > 0) {
-        merged.set(doc, [...docOverrides, ...latestImageOverrides]);
+    const writeDom = () => {
+      if (result.isNativeDark) {
+        renderLayerPath(new Map());
+        revertDirectRewrites(directRewriteEntries);
+        directRewriteEntries = [];
+        inlineTracker.revertAll();
+        return;
       }
-      renderLayerPath(merged);
-    } else {
-      renderDirectRewritePath(result.directRewrites);
-    }
 
-    renderInlineRewrites(result.inlineRewrites);
+      if (useLayers) {
+        const docOverrides = result.overridesByRoot.get(doc) ?? [];
+        const merged = new Map(result.overridesByRoot);
+        if (latestImageOverrides.length > 0) {
+          merged.set(doc, [...docOverrides, ...latestImageOverrides]);
+        }
+        renderLayerPath(merged);
+      } else {
+        renderDirectRewritePath(result.directRewrites);
+      }
+
+      renderInlineRewrites(result.inlineRewrites);
+    };
+
+    if (watcher) {
+      watcher.withoutObserving(writeDom);
+    } else {
+      writeDom();
+    }
 
     if (shouldScanImages) {
       maybeScanImages();
@@ -241,7 +259,7 @@ export function applyTheme(
   }
 
   render();
-  const stopWatching = observeMutations(doc, scheduleRender);
+  watcher = observeMutations(doc, scheduleRender);
   // Same-realm CSSOM rule insertion/deletion (see dom/stylesheet-mutation-
   // watch.ts's doc comment for the significant caveat on what this
   // actually covers in a real extension's isolated-world content script).
@@ -249,7 +267,7 @@ export function applyTheme(
 
   return () => {
     disposed = true;
-    stopWatching();
+    watcher?.dispose();
     stopWatchingStylesheets();
     for (const dispose of layerDisposersByRoot.values()) dispose();
     layerDisposersByRoot.clear();
