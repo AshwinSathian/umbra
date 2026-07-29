@@ -74,7 +74,20 @@ export function applyLayerTheme(root: Document | ShadowRoot, cssText: string): (
     styleEl.setAttribute(MANAGED_STYLE_MARKER_ATTR, "true");
     getInsertionParent(root).appendChild(styleEl);
   }
-  styleEl.textContent = cssText;
+  // A mutation-triggered re-render very often produces byte-identical CSS to
+  // what's already applied (the triggering mutation was unrelated to any
+  // themed value — a scroll-driven class toggle, an unrelated attribute
+  // flip, etc.). Writing `textContent` unconditionally forces the browser to
+  // reparse and recalculate style for the *entire* managed stylesheet every
+  // time regardless, which on a page with a large override set is real,
+  // avoidable work on top of computeTheme() itself. Comparing against the
+  // already-applied text first (a cheap string comparison) and skipping the
+  // write when nothing actually changed avoids that reparse for the common
+  // no-op case — a freshly created element's textContent starts as "", so
+  // this only ever skips a write that would genuinely have been a no-op.
+  if (styleEl.textContent !== cssText) {
+    styleEl.textContent = cssText;
+  }
 
   return () => {
     styleEl.remove();

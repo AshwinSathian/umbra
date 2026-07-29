@@ -604,6 +604,97 @@ deserves its own store-listing permission-justification update (see RELEASING.md
 process for exactly this), not a silent addition riding alongside an unrelated jank fix. See
 CHANGELOG.md's "Known gaps" for the tracked entry.
 
+### Follow-up: jank still visible after the `var()` fix, an incorrectly-inverted LinkedIn banner, and a popup redesign
+
+Reported together, live, in the same session: (1) the extension was still visibly choppy on
+LinkedIn despite the `VarResolutionCache` fix above, (2) some images looked "inverted" rather
+than dark-moded (screenshots showed LinkedIn's profile cover-photo banner), and (3) the popup
+was two bare buttons with no real controls. Investigated and fixed via `superpowers:systematic-
+debugging` (Phase 1–2 root-cause investigation before any fix, per that skill's process).
+
+**Jank, root cause.** `VarResolutionCache` only memoized the forced-layout `getComputedStyle`
+call feeding *into* `computeTheme`'s recolor pipeline — it never touched the pipeline itself.
+Every resolved value, fresh or unchanged since the last render, still ran through the full
+OKLCH round-trip + gamut-mapping + iterative WCAG contrast-solve (`contrast-solver.ts`'s
+`solveContrastingColor`, up to 40 binary-search iterations, each itself doing a gamut-mapped
+OKLCH→sRGB conversion) from scratch, for every themed property on every rule, on every single
+mutation-triggered render. The commit that added `VarResolutionCache` had already measured
+`computeTheme()` at 172ms *after* its own fix on a ~3,000-rule synthetic stylesheet — that
+remaining 172ms/render, repeating on every mutation batch during continuous scroll, is real,
+visible jank regardless of the earlier fix. A real page's stylesheet overwhelmingly repeats a
+small design-token palette across hundreds/thousands of selectors (every card sharing the same
+`--card-bg`/`#1a1a1a`), so this cost scales with total stylesheet size, not with the number of
+*distinct* colors actually present — almost always far smaller.
+
+**Fix.** `RecoloredValueCache` (`theme/theme-engine.ts`) memoizes `computeRecoloredValue`'s
+output keyed on its only two real inputs: the declared raw value and which property it's for.
+This is safe *unconditionally*, unlike a cache keyed on rule/element identity — the function has
+no other dependency, so identical `(property, raw)` always produces an identical result
+regardless of DOM churn, rule mutation, or a matched element changing; if the raw value itself
+ever changes, the cache key changes with it and a fresh value is computed automatically, so
+there is no invalidation logic to get wrong for the DOM side. The one real invalidation need is
+`settings` changing (a brightness-slider drag): guarded by clearing the whole cache whenever the
+`settings` reference differs from the one last seen, rather than trusting every call site to
+construct a fresh instance. Same ownership/lifecycle as `VarResolutionCache` — created once per
+`applyTheme()` call in `apply-theme.ts`, torn down and recreated on `restart()`.
+
+Paired with a second, smaller, complementary fix: `layer-injector.ts`'s `applyLayerTheme`
+previously wrote `styleEl.textContent = cssText` unconditionally on every render. It now skips
+that write when the freshly computed CSS is byte-identical to what's already applied — a cheap
+string comparison avoiding a full CSSOM reparse/style-recalc of the entire managed stylesheet
+for the common case where a render was triggered by a mutation that didn't change any themed
+value at all (a class toggle on an unrelated element, an animation frame, etc.).
+
+**Image "inversion," root cause.** Confirmed via `grep` that `invert(1) hue-rotate(180deg)`
+(`image/image-theme.ts`'s `RECOLOR_FILTER_VALUE`) is the only place in the codebase that ever
+touches image/media pixels, and it's applied only to `<img>` elements the classifier
+(`image/classify.ts`) calls `"flat"`. A pre-existing test already documents the exact tradeoff
+class responsible: a smooth, low-color-diversity gradient is deliberately classified `"flat"`
+("decorative art, not photographic content... fine to recolor") because its pixel signature
+(few distinct colors, no sharp local edges) is indistinguishable from a small icon/badge asset
+by content alone — correct for an icon, where the resulting filter is imperceptible. LinkedIn's
+default profile cover-photo banner has exactly that pixel signature but is rendered hundreds of
+pixels across, where the identical transform is highly visible and reads as broken/inverted, not
+dark-moded. The classifier had no notion of the image's actual rendered/decoded size to
+distinguish the two cases.
+
+**Fix.** A `MAX_FLAT_RECOLOR_DIMENSION` (512px) gate in `analyzeImage` downgrades a `"flat"`
+verdict to `"uncertain"` whenever the sampled image's decoded natural width or height exceeds
+it — cheap (`PixelGrid.width`/`height` is already computed for every sampled image; no extra
+DOM/layout read, consistent with the rest of the codebase's effort to avoid forced layout) and
+safe (only ever downgrades `"flat"`; the `"photo"` verdict and the hard "never alter photos"
+guarantee are entirely untouched by this gate — see `media-guard.ts`'s doc comment on why that
+guarantee must never depend on a classifier being right). Under conservative mode (the default)
+an `"uncertain"` image is left alone, same as any other ambiguous case. Regression test added
+against a 1584×396 fixture using the identical gradient pixel pattern as the existing
+small-icon "flat gradient" test, at LinkedIn's actual real-world banner dimensions.
+
+**Popup redesign.** The popup (`packages/ext-chrome/src/popup/`) was two bare buttons and a
+status string. Rebuilt with real inline controls — an aperture-ring primary toggle for the
+current site (visual signature chosen because "Darkframe" is itself a borrowed astrophotography
+calibration term), a global-enable switch, a conservative-image-mode switch, and
+Brightness/Contrast/Background-darkness sliders under a progressive-disclosure "Tuning"
+section — all reading/writing the same `THEME_SETTINGS_KEY` storage and
+`darkframe:settings-changed` broadcast as the full options page (`readStoredThemeSettings`/
+`scheduleSettingsSave` in `popup.ts` mirror `options.ts`'s existing pattern exactly), so a
+change made from either surface is picked up by the other. A shared token/component stylesheet
+(`packages/ext-chrome/src/styles/darkframe-ui.css`) gives the options page a matching visual
+refresh, since it's one click away via the popup's new "All settings" link
+(`chrome.runtime.openOptionsPage()`, already declared as `options_page` in `manifest.json`).
+
+The first implementation of the aperture-ring toggle used 8 individually-`rotate(N 50 50)`-
+transformed SVG `<rect>` blades in a 0–100 viewBox. Verified visually via Playwright
+(`browser_run_code_unsafe`, since this is a small popup surface with no dedicated dev server —
+served over a throwaway local `python3 -m http.server` against `packages/ext-chrome/dist`) and
+found broken: `document.elementFromPoint()` sampled at each blade's own reported center showed
+6 of the 8 blades landing on unrelated page elements entirely, not the button — the per-blade
+SVG transform math did not reliably keep rotated content within the button's own rendered box.
+Replaced with a `repeating-conic-gradient` CSS background (8 segments at 45° composited under a
+`radial-gradient` center hole, first-listed layer paints on top) — the same visual iris pattern
+with no per-element coordinate math to get wrong. Re-verified visually (ON/OFF/tuning-open
+states, real click interactions against a stateful mock of the `chrome.*` APIs) before
+considering the control done.
+
 ## 🧪 Testing Strategy
 
 - **Unit tests (Vitest)**: `packages/core/color` (OKLCH round-trip, gamut mapping, contrast solver — property-based + fixed-case tests), `packages/core/image` (classifier decision table against synthetic fixtures), `packages/core/dom` (style discovery against jsdom/happy-dom fixtures, injector mutation-free guarantee). Target ≥ 90% line coverage on `packages/core`.

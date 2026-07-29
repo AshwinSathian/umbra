@@ -387,7 +387,7 @@ async function main() {
       await resiliencePopup.waitForTimeout(500);
 
       const statusText = await resiliencePopup.evaluate(
-        () => document.getElementById("status")?.textContent ?? "",
+        () => document.getElementById("status-word")?.textContent ?? "",
       );
       results.checks.push({
         name: "popup still resolves extension state correctly after the MV3 service worker is force-terminated and respawns",

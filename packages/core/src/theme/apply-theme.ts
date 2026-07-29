@@ -15,7 +15,13 @@ import { OriginalValueCache } from "../dom/original-value-cache.js";
 import { observeStylesheetMutations } from "../dom/stylesheet-mutation-watch.js";
 import type { ImageSampler } from "../image/image-theme.js";
 import { ImageAnalysisCache, planImageOverrides } from "../image/image-theme.js";
-import { DEFAULT_THEME_SETTINGS, type ThemeSettings, VarResolutionCache, computeTheme } from "./theme-engine.js";
+import {
+  DEFAULT_THEME_SETTINGS,
+  RecoloredValueCache,
+  type ThemeSettings,
+  VarResolutionCache,
+  computeTheme,
+} from "./theme-engine.js";
 
 /**
  * The single function that touches the live DOM. Computes the theme,
@@ -83,6 +89,14 @@ export function applyTheme(
   // on every var()-backed rule. See VarResolutionCache's doc comment in
   // theme-engine.ts for why persisting this across renders is safe.
   const varResolutionCache = new VarResolutionCache();
+  // Memoizes the recolored output of every distinct (property, raw color
+  // value) pair across renders — the same "don't redo expensive work that
+  // didn't change" reasoning as the caches above, but for the OKLCH/gamut-
+  // mapping/contrast-solving CPU cost paid per declaration. See
+  // RecoloredValueCache's doc comment in theme-engine.ts for why this is
+  // safe unconditionally (no dependency beyond its own two inputs) and load-
+  // bearing for jank on content-heavy pages, not just an optimization.
+  const recoloredValueCache = new RecoloredValueCache();
   let latestImageOverrides: SelectorOverride[] = [];
   let imageScanInFlight = false;
   let crossOriginScanInFlight = false;
@@ -181,6 +195,7 @@ export function applyTheme(
       settings,
       (style, property) => originalValues.resolve(style, property),
       varResolutionCache,
+      recoloredValueCache,
     );
 
     const writeDom = () => {

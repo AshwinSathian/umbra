@@ -39,6 +39,30 @@ const FLAT_COLOR_DIVERSITY_MAX = 6;
 const PHOTO_EDGE_DENSITY_MIN = 0.3;
 const PHOTO_COLOR_DIVERSITY_MIN = 8;
 
+// The flat/photo gate above is pixel-content-only — it has no notion of how
+// large or visually prominent the image actually is. That is correct for
+// its original target (a smooth gradient *icon or badge asset*, small
+// enough that a lightness/hue shift is imperceptible), but the exact same
+// pixel signature (few distinct colors, no sharp local edges) is produced
+// by a large decorative hero/banner image — e.g. a profile page's cover
+// photo, confirmed live on LinkedIn's default gradient banner. Applying the
+// icon-tuned recolor filter (`invert(1) hue-rotate(180deg)` — see
+// image/image-theme.ts) to something rendered at hundreds of pixels across
+// is highly visible and reads as a broken/incorrectly-inverted image, not a
+// graceful dark-mode adaptation, even though the classifier's reasoning for
+// calling it "flat" was sound in isolation. A decoded-pixel-dimension gate
+// catches this cheaply (PixelGrid.width/height is already computed for
+// every sampled image — no extra DOM/layout read needed, keeping this
+// consistent with the rest of the codebase's effort to avoid forced
+// layout): real icons/logos/badges are essentially always well under this
+// size, while banner/hero art is essentially always well over it. Only
+// downgrades "flat" to "uncertain" (never touches "photo") — under
+// conservative mode (the default) "uncertain" is left untouched, the same
+// safe fallback every other ambiguous case already gets; it remains
+// eligible for recolor only if the user has explicitly opted out of
+// conservative mode, same as any other uncertain image.
+const MAX_FLAT_RECOLOR_DIMENSION = 512;
+
 export function analyzeImage(grid: PixelGrid): ImageAnalysis {
   const lightness = computeLightnessStats(grid);
   const edgeDensity = computeEdgeDensity(grid);
@@ -52,6 +76,15 @@ export function analyzeImage(grid: PixelGrid): ImageAnalysis {
   if (looksFlat && !looksPhoto) classification = "flat";
   else if (looksPhoto && !looksFlat) classification = "photo";
   else classification = "uncertain";
+
+  // See MAX_FLAT_RECOLOR_DIMENSION above — a large image never gets the
+  // icon-tuned "flat" treatment purely on the strength of a low-edge-
+  // density/low-color-diversity pixel signature; a "photo" verdict is
+  // untouched by this (the hard "never alter photos" guarantee never
+  // depends on this gate being right).
+  if (classification === "flat" && (grid.width > MAX_FLAT_RECOLOR_DIMENSION || grid.height > MAX_FLAT_RECOLOR_DIMENSION)) {
+    classification = "uncertain";
+  }
 
   return {
     meanLightness: lightness.meanLightness,

@@ -45,6 +45,15 @@ const linearGradientGrid = makeGrid(32, 32, (x) => {
   return [Math.round(20 + t * 200), Math.round(20 + t * 200), Math.round(20 + t * 200), 255];
 });
 
+/** Same smooth-gradient pixel signature as linearGradientGrid (few distinct
+ * colors, no sharp local edges) but at large-banner dimensions — the exact
+ * shape of LinkedIn's default profile cover-photo asset, confirmed live as
+ * the source of a reported "images look inverted" bug. */
+const largeGradientBannerGrid = makeGrid(1584, 396, (x) => {
+  const t = x / 1583;
+  return [Math.round(20 + t * 200), Math.round(20 + t * 200), Math.round(20 + t * 200), 255];
+});
+
 const noisePhotoGrid = (() => {
   const rand = mulberry32(11);
   return makeGrid(32, 32, () => [
@@ -99,6 +108,22 @@ describe("analyzeImage", () => {
     // oversight: the hard requirement is "never alter photos/media", and a
     // flat gradient swatch is neither.
     expect(analyzeImage(linearGradientGrid).classification).toBe("flat");
+  });
+
+  it("REGRESSION: does not classify a large decorative gradient banner as flat, even though its pixel signature alone would qualify", () => {
+    // Confirmed live: LinkedIn's default profile cover-photo banner has
+    // exactly this pixel signature (smooth, low color diversity, no sharp
+    // edges) but is rendered hundreds of pixels across. Recoloring it with
+    // the icon-tuned invert(1) hue-rotate(180deg) filter (see
+    // image/image-theme.ts) is highly visible and reads as a broken,
+    // incorrectly-inverted image rather than a graceful dark-mode
+    // adaptation — unlike the small-icon case above, where the exact same
+    // transform is imperceptible. "uncertain" (not "flat") is the correct
+    // verdict here: under conservative mode (the default) it is left
+    // untouched, same as any other ambiguous image.
+    const analysis = analyzeImage(largeGradientBannerGrid);
+    expect(analysis.classification).toBe("uncertain");
+    expect(shouldRecolorImage(analysis, true)).toBe(false);
   });
 
   it("THE key regression case: a bright product photo on a white background is never classified as flat, despite a high global mean lightness", () => {

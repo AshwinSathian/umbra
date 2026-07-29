@@ -42,7 +42,10 @@ await build({
 
 cpSync(path.join(dir, "manifest.json"), path.join(distDir, "manifest.json"));
 cpSync(path.join(dir, "src/popup/popup.html"), path.join(distDir, "popup.html"));
+cpSync(path.join(dir, "src/popup/popup.css"), path.join(distDir, "popup.css"));
 cpSync(path.join(dir, "src/options/options.html"), path.join(distDir, "options.html"));
+cpSync(path.join(dir, "src/options/options.css"), path.join(distDir, "options.css"));
+cpSync(path.join(dir, "src/styles/darkframe-ui.css"), path.join(distDir, "darkframe-ui.css"));
 cpSync(path.join(dir, "icons"), path.join(distDir, "icons"), { recursive: true });
 
 console.log("Built extension to", distDir);

@@ -52,6 +52,30 @@ describe("applyLayerTheme", () => {
     expect(managed[0]?.textContent).not.toContain("\na {");
   });
 
+  it("PERF: does not rewrite textContent when the newly computed CSS is identical to what's already applied", () => {
+    // A mutation-triggered re-render very often produces byte-identical
+    // output (the triggering mutation was unrelated to any themed value).
+    // Writing textContent unconditionally forces a full reparse/style-
+    // recalc of the managed stylesheet every time regardless — this
+    // asserts the element itself is left untouched (not merely that the
+    // string value is equal) when called twice with the same CSS text.
+    const css = buildLayerStylesheetText([
+      { selectorText: "body", properties: [{ property: "background-color", value: "rgb(10, 10, 10)" }] },
+    ]);
+    applyLayerTheme(document, css);
+    const styleEl = document.querySelector(`#${MANAGED_STYLE_ID}`) as HTMLStyleElement;
+    const firstTextNode = styleEl.firstChild;
+
+    applyLayerTheme(document, css);
+    expect(styleEl.firstChild).toBe(firstTextNode); // same text node instance — no write happened
+
+    const differentCss = buildLayerStylesheetText([
+      { selectorText: "body", properties: [{ property: "background-color", value: "rgb(20, 20, 20)" }] },
+    ]);
+    applyLayerTheme(document, differentCss);
+    expect(styleEl.textContent).toBe(differentCss); // still updates when content genuinely changes
+  });
+
   it("injects into a shadow root directly (not into the document) since shadow styling is encapsulated", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);

@@ -1,0 +1,263 @@
+/*
+ * Shared design tokens + component primitives for the popup and options
+ * page. "Darkframe" is itself a borrowed astrophotography term — a
+ * calibration exposure taken with the shutter closed, used to cancel out
+ * sensor noise — so the visual language leans into a precision-instrument
+ * feel (warm near-black, a single safelight-amber accent, monospace
+ * numeric readouts) rather than a generic flat-UI dark theme.
+ */
+
+:root {
+  --df-void: #0d0c0b;
+  --df-panel: #17140f;
+  --df-raised: #211c15;
+  --df-raised-hover: #2a2319;
+  --df-line: rgba(255, 255, 255, 0.08);
+  --df-ink: #f3efe6;
+  --df-ink-dim: #9a9187;
+  --df-ink-faint: #625c53;
+  --df-amber: #e2a23d;
+  --df-amber-strong: #f2b757;
+  --df-amber-soft: rgba(226, 162, 61, 0.16);
+  --df-focus: #f2b757;
+
+  --df-font-display: -apple-system, "SF Pro Display", system-ui, sans-serif;
+  --df-font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, monospace;
+
+  --df-radius-sm: 6px;
+  --df-radius-md: 10px;
+  --df-radius-lg: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.df-surface {
+  margin: 0;
+  background: var(--df-void);
+  color: var(--df-ink);
+  font-family: var(--df-font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+.df-eyebrow {
+  font-family: var(--df-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--df-ink-faint);
+}
+
+.df-mono {
+  font-family: var(--df-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.df-divider {
+  border: none;
+  border-top: 1px solid var(--df-line);
+  margin: 0;
+}
+
+/* Focus ring: consistent, visible, amber — applied to every interactive
+   primitive below rather than relying on browser defaults, which render
+   inconsistently (or not at all) inside an extension popup's WebView. */
+.df-focusable:focus-visible {
+  outline: 2px solid var(--df-focus);
+  outline-offset: 2px;
+  border-radius: var(--df-radius-sm);
+}
+
+/* ---- Switch row (label + description + toggle) ------------------------ */
+
+.df-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.df-switch-row + .df-switch-row {
+  border-top: 1px solid var(--df-line);
+}
+
+.df-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.df-switch-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--df-ink);
+}
+
+.df-switch-hint {
+  font-size: 11px;
+  color: var(--df-ink-faint);
+  line-height: 1.4;
+}
+
+.df-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--df-raised);
+  border: 1px solid var(--df-line);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.df-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--df-ink-dim);
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.15s ease;
+}
+
+.df-switch[aria-checked="true"] {
+  background: var(--df-amber-soft);
+  border-color: var(--df-amber);
+}
+
+.df-switch[aria-checked="true"]::after {
+  transform: translateX(14px);
+  background: var(--df-amber);
+}
+
+.df-switch:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df-switch::after {
+    transition: none;
+  }
+}
+
+/* ---- Slider (label + mono value readout + range track) ---------------- */
+
+.df-slider-row {
+  padding: 9px 0;
+}
+
+.df-slider-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.df-slider-label {
+  font-size: 12px;
+  color: var(--df-ink-dim);
+}
+
+.df-slider-value {
+  font-size: 11px;
+  color: var(--df-amber-strong);
+}
+
+.df-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--df-raised);
+  cursor: pointer;
+}
+
+.df-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--df-amber);
+  border: 2px solid var(--df-void);
+  box-shadow: 0 0 0 1px var(--df-amber);
+  margin-top: -5px;
+}
+
+.df-slider::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--df-amber);
+  border: 2px solid var(--df-void);
+  box-shadow: 0 0 0 1px var(--df-amber);
+}
+
+.df-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--df-raised);
+}
+
+.df-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--df-raised);
+}
+
+/* ---- Buttons / links ---------------------------------------------------- */
+
+.df-link-button {
+  appearance: none;
+  background: none;
+  border: none;
+  color: var(--df-ink-dim);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.15s ease;
+}
+
+.df-link-button:hover {
+  color: var(--df-amber-strong);
+}
+
+.df-button {
+  appearance: none;
+  border: 1px solid var(--df-line);
+  background: var(--df-raised);
+  color: var(--df-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: var(--df-radius-sm);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.df-button:hover {
+  background: var(--df-raised-hover);
+  border-color: var(--df-amber);
+}

@@ -1,0 +1,207 @@
+body {
+  width: 320px;
+  padding: 16px 18px 14px;
+}
+
+/* ---- Header ------------------------------------------------------------ */
+
+.df-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.df-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.df-mark {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.df-mark circle {
+  stroke: var(--df-amber);
+}
+
+.df-wordmark-text {
+  font-family: var(--df-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--df-ink);
+}
+
+.df-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--df-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--df-ink-faint);
+}
+
+.df-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--df-ink-faint);
+  box-shadow: none;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.df-status-pill[data-active="true"] .df-status-dot {
+  background: var(--df-amber);
+  box-shadow: 0 0 6px 1px var(--df-amber-soft);
+}
+
+.df-status-pill[data-active="true"] {
+  color: var(--df-amber-strong);
+}
+
+.df-origin {
+  font-family: var(--df-font-mono);
+  font-size: 12.5px;
+  color: var(--df-ink-dim);
+  margin: 2px 0 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Aperture-ring primary toggle --------------------------------------- */
+
+.df-aperture-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 16px;
+}
+
+/*
+ * A camera aperture diaphragm rendered entirely as layered CSS backgrounds
+ * (no per-element SVG transforms — a per-blade <rect rotate(N 50 50)>
+ * version was tried first and turned out fragile: the rendered position of
+ * each rotated blade did not reliably stay within the button's own box
+ * across viewBox/transform-origin interactions, confirmed via
+ * elementFromPoint sampling showing 6 of 8 blades landing outside the
+ * button entirely). `repeating-conic-gradient` produces the same 8-blade
+ * iris pattern as a single declarative background with no coordinate math
+ * to get wrong, composited under a radial-gradient that punches the center
+ * hole (first-listed background layer paints on top).
+ */
+.df-aperture {
+  appearance: none;
+  border: 1.5px solid var(--df-line);
+  padding: 0;
+  cursor: pointer;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, var(--df-panel) 0 41%, transparent 42%),
+    repeating-conic-gradient(var(--df-raised) 0deg 38deg, transparent 38deg 45deg);
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.df-aperture[aria-checked="true"] {
+  border-color: var(--df-amber-soft);
+  background:
+    radial-gradient(circle at center, var(--df-panel) 0 41%, transparent 42%),
+    repeating-conic-gradient(var(--df-amber) 0deg 38deg, transparent 38deg 45deg);
+  transform: rotate(22.5deg);
+}
+
+.df-aperture-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--df-ink);
+}
+
+.df-aperture-sublabel {
+  font-family: var(--df-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--df-ink-faint);
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .df-aperture {
+    transition: none;
+  }
+}
+
+/* ---- Sections ------------------------------------------------------------ */
+
+.df-section {
+  margin-top: 4px;
+}
+
+.df-tuning {
+  margin-top: 4px;
+}
+
+.df-tuning summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--df-ink-dim);
+}
+
+.df-tuning summary::-webkit-details-marker {
+  display: none;
+}
+
+.df-tuning summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--df-ink-faint);
+  border-bottom: 1.5px solid var(--df-ink-faint);
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease;
+}
+
+.df-tuning[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.df-tuning summary:hover {
+  color: var(--df-ink);
+}
+
+.df-tuning-body {
+  padding-bottom: 6px;
+}
+
+.df-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.df-unavailable {
+  padding: 22px 4px 26px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--df-ink-dim);
+  line-height: 1.5;
+}

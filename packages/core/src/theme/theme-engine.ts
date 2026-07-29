@@ -398,6 +398,65 @@ export class VarResolutionCache {
 }
 
 /**
+ * Memoizes {@link computeRecoloredValue}'s output, keyed on the exact
+ * inputs it is a pure function of: the declared raw value and which
+ * property it's for (the same raw string recolors differently for a
+ * background-role property than a foreground-role one) — plus, implicitly,
+ * the active `settings` (see the reset-on-change guard below).
+ *
+ * Persisted *across* renders (owned by apply-theme.ts, same lifecycle as
+ * VarResolutionCache/OriginalValueCache/ImageAnalysisCache) because a real
+ * stylesheet overwhelmingly repeats a small design-token palette across
+ * hundreds or thousands of selectors (every card on a page sharing the same
+ * `--card-bg`/`#1a1a1a`), so recomputing the *same* OKLCH round-trip +
+ * gamut-mapping + iterative WCAG contrast-solve (up to 40 binary-search
+ * iterations per call — see contrast-solver.ts) for every individual rule,
+ * on every single mutation-triggered render, is real, measured, redundant
+ * work that scales with total stylesheet size rather than with the number
+ * of *distinct* colors actually on the page (almost always far smaller).
+ * This is the CPU cost VarResolutionCache's fix (see its own doc comment)
+ * did not address: that fix cut the forced-layout `getComputedStyle` calls
+ * feeding *into* this pipeline, but every resolved value — whether fresh or
+ * unchanged since the previous render — still ran through the full recolor
+ * pipeline from scratch every time, which is why real content-heavy pages
+ * (continuous DOM churn from infinite scroll, live-updating widgets, etc.)
+ * kept visibly janking even after that fix landed.
+ *
+ * Safe unconditionally, unlike a cache keyed on rule/element identity:
+ * `computeRecoloredValue` has no dependency beyond its own arguments, so
+ * identical `(property, raw)` inputs are *guaranteed* to produce an
+ * identical output no matter what else is happening on the page — no
+ * dedicated invalidation logic is needed for DOM churn, rule mutation, or a
+ * matched element changing. If the raw declared value itself ever changes
+ * (a page's own script rewriting a rule's color, or a var() reference
+ * resolving differently), the cache key changes with it and a fresh value
+ * is computed automatically — there is no way for this cache to serve a
+ * stale answer for an input it has actually seen change. The one real
+ * invalidation need is `settings` itself changing (e.g. the user drags a
+ * brightness slider in the options page): guarded by clearing the whole
+ * cache whenever the `settings` reference passed in differs from the one
+ * last seen, rather than relying on every call site remembering to
+ * construct a fresh instance.
+ */
+export class RecoloredValueCache {
+  private cache = new Map<string, string | null>();
+  private lastSettings: ThemeSettings | null = null;
+
+  resolve(raw: string, property: string, settings: ThemeSettings, compute: () => string | null): string | null {
+    if (settings !== this.lastSettings) {
+      this.cache.clear();
+      this.lastSettings = settings;
+    }
+    const key = property + " " + raw;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+    const value = compute();
+    this.cache.set(key, value);
+    return value;
+  }
+}
+
+/**
  * Computes the full theme for a document: native-dark detection first
  * (short-circuiting to no overrides at all if the page already ships its
  * own dark theme), then a pass over every discovered stylesheet's rules,
@@ -413,6 +472,7 @@ export function computeTheme(
   settings: ThemeSettings = DEFAULT_THEME_SETTINGS,
   resolveOriginalValue: OriginalValueResolver = defaultResolveOriginalValue,
   varResolutionCache: VarResolutionCache = new VarResolutionCache(),
+  recoloredValueCache: RecoloredValueCache = new RecoloredValueCache(),
 ): ThemeResult {
   const nativeDark = detectNativeDark(doc);
   if (nativeDark.isNativeDark) {
@@ -460,7 +520,9 @@ export function computeTheme(
           raw = resolveVarBackedValue(raw, computed);
         }
 
-        const value = computeRecoloredValue(raw, property, settings, assumedBackgroundRgb);
+        const value = recoloredValueCache.resolve(raw, property, settings, () =>
+          computeRecoloredValue(raw, property, settings, assumedBackgroundRgb),
+        );
         if (!value) continue;
 
         properties.push({ property, value });
@@ -492,7 +554,9 @@ export function computeTheme(
         raw = resolveVarBackedValue(raw, elWindow.getComputedStyle(el));
       }
 
-      const value = computeRecoloredValue(raw, property, settings, assumedBackgroundRgb);
+      const value = recoloredValueCache.resolve(raw, property, settings, () =>
+        computeRecoloredValue(raw, property, settings, assumedBackgroundRgb),
+      );
       if (!value) continue;
 
       inlineRewrites.push({ style: el.style, property, value });

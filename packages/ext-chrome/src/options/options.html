@@ -3,111 +3,148 @@
   <head>
     <meta charset="utf-8" />
     <title>Darkframe Settings</title>
-    <style>
-      body {
-        font-family: -apple-system, system-ui, sans-serif;
-        max-width: 480px;
-        margin: 32px auto;
-        padding: 0 16px;
-        background: #121016;
-        color: #eee;
-      }
-      h1 {
-        font-size: 18px;
-      }
-      .row {
-        margin: 18px 0;
-      }
-      label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 13px;
-        margin-bottom: 4px;
-      }
-      input[type="range"] {
-        width: 100%;
-      }
-      .checkbox-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-      }
-      .hint {
-        font-size: 11px;
-        color: #999;
-        margin-top: 2px;
-      }
-      button {
-        margin-top: 20px;
-        padding: 8px 14px;
-        border-radius: 6px;
-        border: none;
-        background: #3a6ff0;
-        color: white;
-        cursor: pointer;
-      }
-      #saved {
-        font-size: 12px;
-        color: #7ee787;
-        margin-left: 10px;
-        opacity: 0;
-        transition: opacity 0.2s;
-      }
-    </style>
+    <link rel="stylesheet" href="darkframe-ui.css" />
+    <link rel="stylesheet" href="options.css" />
   </head>
-  <body>
-    <h1>Darkframe Settings</h1>
-
-    <div class="row">
-      <label>Background darkness <span id="backgroundLightness-value"></span></label>
-      <input type="range" id="backgroundLightness" min="0.05" max="0.4" step="0.01" />
+  <body class="df-surface">
+    <div class="df-page-header">
+      <svg class="df-page-mark" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="6" />
+        <circle cx="8" cy="8" r="2" />
+      </svg>
+      <span class="df-page-title">DARKFRAME</span>
     </div>
+    <p class="df-page-subtitle">
+      Calibration — every value here is shared live with the popup's quick controls.
+    </p>
 
-    <div class="row">
-      <label>Text lightness <span id="foregroundLightness-value"></span></label>
-      <input type="range" id="foregroundLightness" min="0.6" max="0.98" step="0.01" />
-    </div>
-
-    <div class="row">
-      <label>Minimum text contrast (WCAG ratio) <span id="contrastTarget-value"></span></label>
-      <input type="range" id="contrastTarget" min="3" max="10" step="0.5" />
-    </div>
-
-    <div class="row">
-      <label>Brightness <span id="brightness-value"></span></label>
-      <input type="range" id="brightness" min="0.5" max="1.5" step="0.05" />
-    </div>
-
-    <div class="row">
-      <label>Contrast <span id="contrast-value"></span></label>
-      <input type="range" id="contrast" min="0.5" max="1.5" step="0.05" />
-    </div>
-
-    <div class="row">
-      <label>Sepia <span id="sepia-value"></span></label>
-      <input type="range" id="sepia" min="0" max="1" step="0.05" />
-    </div>
-
-    <div class="row">
-      <label>Grayscale <span id="grayscale-value"></span></label>
-      <input type="range" id="grayscale" min="0" max="1" step="0.05" />
-    </div>
-
-    <div class="row">
-      <div class="checkbox-row">
-        <input type="checkbox" id="imageConservativeMode" />
-        <label for="imageConservativeMode" style="margin:0;">Conservative image mode</label>
+    <div class="df-group">
+      <p class="df-group-title">Tone</p>
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="backgroundLightness">Background darkness</label>
+          <span class="df-slider-value df-mono" id="backgroundLightness-value"></span>
+        </div>
+        <input
+          type="range"
+          class="df-slider df-focusable"
+          id="backgroundLightness"
+          min="0.05"
+          max="0.4"
+          step="0.01"
+        />
       </div>
-      <div class="hint">
-        When on (recommended), any image the classifier isn't confident about is left
-        untouched. Turning this off also recolors images Darkframe is uncertain about — photos
-        the classifier confidently recognizes as photos are never recolored either way.
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="foregroundLightness">Text lightness</label>
+          <span class="df-slider-value df-mono" id="foregroundLightness-value"></span>
+        </div>
+        <input
+          type="range"
+          class="df-slider df-focusable"
+          id="foregroundLightness"
+          min="0.6"
+          max="0.98"
+          step="0.01"
+        />
+      </div>
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="contrastTarget"
+            >Minimum text contrast (WCAG ratio)</label
+          >
+          <span class="df-slider-value df-mono" id="contrastTarget-value"></span>
+        </div>
+        <input
+          type="range"
+          class="df-slider df-focusable"
+          id="contrastTarget"
+          min="3"
+          max="10"
+          step="0.5"
+        />
       </div>
     </div>
 
-    <button id="reset">Reset to defaults</button>
-    <span id="saved">Saved</span>
+    <div class="df-group">
+      <p class="df-group-title">Image adjustments</p>
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="brightness">Brightness</label>
+          <span class="df-slider-value df-mono" id="brightness-value"></span>
+        </div>
+        <input
+          type="range"
+          class="df-slider df-focusable"
+          id="brightness"
+          min="0.5"
+          max="1.5"
+          step="0.05"
+        />
+      </div>
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="contrast">Contrast</label>
+          <span class="df-slider-value df-mono" id="contrast-value"></span>
+        </div>
+        <input
+          type="range"
+          class="df-slider df-focusable"
+          id="contrast"
+          min="0.5"
+          max="1.5"
+          step="0.05"
+        />
+      </div>
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="sepia">Sepia</label>
+          <span class="df-slider-value df-mono" id="sepia-value"></span>
+        </div>
+        <input type="range" class="df-slider df-focusable" id="sepia" min="0" max="1" step="0.05" />
+      </div>
+      <div class="df-slider-row-lg">
+        <div class="df-slider-head">
+          <label class="df-slider-label" for="grayscale">Grayscale</label>
+          <span class="df-slider-value df-mono" id="grayscale-value"></span>
+        </div>
+        <input
+          type="range"
+          class="df-slider df-focusable"
+          id="grayscale"
+          min="0"
+          max="1"
+          step="0.05"
+        />
+      </div>
+    </div>
+
+    <div class="df-group">
+      <p class="df-group-title">Media</p>
+      <div class="df-switch-row">
+        <div class="df-switch-text">
+          <span class="df-switch-label">Conservative image mode</span>
+          <span class="df-switch-hint">
+            When on (recommended), any image the classifier isn't confident about is left untouched.
+            Turning this off also recolors images Darkframe is uncertain about — photos the
+            classifier confidently recognizes as photos are never recolored either way.
+          </span>
+        </div>
+        <button
+          type="button"
+          id="imageConservativeMode"
+          class="df-switch df-focusable"
+          role="switch"
+          aria-checked="true"
+          aria-label="Toggle conservative image mode"
+        ></button>
+      </div>
+    </div>
+
+    <div class="df-footer-row">
+      <button class="df-button df-focusable" id="reset">Reset to defaults</button>
+      <span id="saved">Saved</span>
+    </div>
 
     <script src="options.js"></script>
   </body>

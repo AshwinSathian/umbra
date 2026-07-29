@@ -15,6 +15,7 @@ DerivedData/
 packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.js
 packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.js.map
 packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.html
+packages/ext-safari/Darkframe/Darkframe Extension/Resources/*.css
 packages/ext-safari/Darkframe/Darkframe Extension/Resources/manifest.json
 packages/ext-safari/Darkframe/Darkframe Extension/Resources/icons/
 

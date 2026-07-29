@@ -3,48 +3,133 @@
   <head>
     <meta charset="utf-8" />
     <title>Darkframe</title>
-    <style>
-      body {
-        width: 220px;
-        font-family: -apple-system, system-ui, sans-serif;
-        padding: 12px;
-        margin: 0;
-        background: #1a1a1a;
-        color: #f0f0f0;
-      }
-      h1 {
-        font-size: 14px;
-        margin: 0 0 8px;
-      }
-      button {
-        width: 100%;
-        padding: 8px;
-        font-size: 13px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        margin-top: 6px;
-      }
-      #site-toggle {
-        background: #3a6ff0;
-        color: white;
-      }
-      #global-toggle {
-        background: #333;
-        color: #ddd;
-      }
-      #status {
-        font-size: 11px;
-        color: #999;
-        margin-top: 8px;
-      }
-    </style>
+    <link rel="stylesheet" href="darkframe-ui.css" />
+    <link rel="stylesheet" href="popup.css" />
   </head>
-  <body>
-    <h1>Darkframe</h1>
-    <button id="site-toggle">Toggle for this site</button>
-    <button id="global-toggle">Toggle globally</button>
-    <div id="status"></div>
+  <body class="df-surface">
+    <header class="df-header">
+      <div class="df-wordmark">
+        <svg class="df-mark" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="6" fill="none" stroke-width="1.4" />
+          <circle cx="8" cy="8" r="2" fill="currentColor" style="color: var(--df-amber)" />
+        </svg>
+        <span class="df-wordmark-text">DARKFRAME</span>
+      </div>
+      <div class="df-status-pill" id="status-pill" data-active="false">
+        <span class="df-status-dot"></span>
+        <span id="status-word">OFF</span>
+      </div>
+    </header>
+
+    <div class="df-origin df-mono" id="origin-line">&nbsp;</div>
+
+    <div id="unavailable" class="df-unavailable" hidden>Darkframe can't run on this page.</div>
+
+    <div id="controls">
+      <div class="df-aperture-block">
+        <button
+          type="button"
+          id="site-toggle"
+          class="df-aperture df-focusable"
+          role="switch"
+          aria-checked="false"
+          aria-label="Enable Darkframe for this site"
+        ></button>
+        <div style="text-align: center">
+          <div class="df-aperture-label" id="site-toggle-label">This site</div>
+          <div class="df-aperture-sublabel" id="site-toggle-sublabel">Off</div>
+        </div>
+      </div>
+
+      <hr class="df-divider" />
+
+      <div class="df-switch-row">
+        <div class="df-switch-text">
+          <span class="df-switch-label">Enabled everywhere</span>
+          <span class="df-switch-hint">Default for sites without their own override</span>
+        </div>
+        <button
+          type="button"
+          id="global-toggle"
+          class="df-switch df-focusable"
+          role="switch"
+          aria-checked="false"
+          aria-label="Enable Darkframe globally"
+        ></button>
+      </div>
+
+      <div class="df-switch-row">
+        <div class="df-switch-text">
+          <span class="df-switch-label">Skip uncertain images</span>
+          <span class="df-switch-hint"
+            >Leaves ambiguous images untouched — photos are never altered either way</span
+          >
+        </div>
+        <button
+          type="button"
+          id="conservative-toggle"
+          class="df-switch df-focusable"
+          role="switch"
+          aria-checked="true"
+          aria-label="Toggle conservative image mode"
+        ></button>
+      </div>
+
+      <details class="df-tuning">
+        <summary>Tuning</summary>
+        <div class="df-tuning-body">
+          <div class="df-slider-row">
+            <div class="df-slider-head">
+              <span class="df-slider-label">Brightness</span>
+              <span class="df-slider-value df-mono" id="brightness-value">1.00</span>
+            </div>
+            <input
+              type="range"
+              class="df-slider df-focusable"
+              id="brightness"
+              min="0.5"
+              max="1.5"
+              step="0.05"
+            />
+          </div>
+          <div class="df-slider-row">
+            <div class="df-slider-head">
+              <span class="df-slider-label">Contrast</span>
+              <span class="df-slider-value df-mono" id="contrast-value">1.00</span>
+            </div>
+            <input
+              type="range"
+              class="df-slider df-focusable"
+              id="contrast"
+              min="0.5"
+              max="1.5"
+              step="0.05"
+            />
+          </div>
+          <div class="df-slider-row">
+            <div class="df-slider-head">
+              <span class="df-slider-label">Background darkness</span>
+              <span class="df-slider-value df-mono" id="backgroundLightness-value">0.22</span>
+            </div>
+            <input
+              type="range"
+              class="df-slider df-focusable"
+              id="backgroundLightness"
+              min="0.05"
+              max="0.4"
+              step="0.01"
+            />
+          </div>
+        </div>
+      </details>
+
+      <div class="df-footer">
+        <button type="button" class="df-link-button df-focusable" id="open-options">
+          All settings →
+        </button>
+      </div>
+    </div>
+
     <script src="popup.js"></script>
   </body>
 </html>

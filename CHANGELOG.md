@@ -41,6 +41,15 @@ All notable changes to this project are documented in this file. The format is b
 - Chrome content script: merged the two sequential `chrome.storage.local.get` calls on
   initial page load (enabled-state check, then theme settings) into one, halving the
   storage round-trip latency before first themed paint.
+- Chrome popup redesigned from two bare buttons into a real quick-control panel: an
+  aperture-ring primary toggle for the current site, a global-enable switch, a
+  conservative-image-mode switch, and inline Brightness/Contrast/Background-darkness
+  sliders under a "Tuning" disclosure — all reading and writing the same
+  `THEME_SETTINGS_KEY` storage and `darkframe:settings-changed` broadcast as the full
+  options page, so either surface stays in sync with the other. The options page got a
+  matching visual refresh (`packages/ext-chrome/src/styles/darkframe-ui.css`, a shared
+  token/component stylesheet) so navigating from the new popup to "All settings" doesn't
+  land somewhere visually unrelated.
 
 ### Fixed
 
@@ -138,6 +147,43 @@ All notable changes to this project are documented in this file. The format is b
   missing element. Verified against the real, installed Grammarly extension in a live Chromium
   instance via Playwright, and with a deterministic regression test (`apply-theme.test.ts`)
   simulating a lone third-party removal.
+- Still-visible jank on content-heavy pages even after the `VarResolutionCache` fix above —
+  reported live, again on LinkedIn. Root-caused to a second, independent cost the earlier fix
+  didn't touch: `VarResolutionCache` only memoized the forced-layout `getComputedStyle` call
+  *feeding into* the recolor pipeline, but every resolved value — fresh or not — still ran
+  through the full OKLCH round-trip + gamut-mapping + iterative WCAG contrast-solve (up to 40
+  binary-search iterations per call — `contrast-solver.ts`) from scratch, on every single
+  mutation-triggered render, for every themed property on every rule. A real stylesheet
+  overwhelmingly repeats a small design-token palette across hundreds/thousands of selectors,
+  so this cost scaled with total stylesheet size rather than with the (almost always far
+  smaller) number of *distinct* colors on the page. **Fix**: `RecoloredValueCache`
+  (`theme/theme-engine.ts`) memoizes the recolor pipeline's output keyed on its only two real
+  inputs — the declared raw value and which property it's for — safe unconditionally (no
+  dependency on DOM/rule identity, so no invalidation logic needed for churn or a matched
+  element changing; if the raw value itself ever changes, the cache key changes with it), with
+  the whole cache cleared if the `settings` reference changes (e.g. a brightness-slider drag).
+  Paired with a second, complementary fix: `layer-injector.ts`'s `applyLayerTheme` now skips
+  the managed stylesheet's `textContent` write entirely when the freshly computed CSS is
+  byte-identical to what's already applied, avoiding a full CSSOM reparse/style-recalc for the
+  common case where a render was triggered by a mutation that didn't actually change any
+  themed value.
+- Large decorative images (banners, cover photos) could get visibly, incorrectly
+  "inverted" — reported live on LinkedIn's default profile cover-photo banner, a smooth,
+  low-color-diversity gradient. Root-caused to `image/classify.ts`'s flat/photo classifier:
+  a smooth gradient's pixel signature (few distinct colors, no sharp local edges) is
+  indistinguishable from a small decorative icon/badge asset by content alone, and the
+  classifier deliberately treats that signature as `"flat"` (see the existing "a pure smooth
+  gradient asset ... is fine to recolor" test) — a sound call for icon-sized assets, where the
+  resulting `invert(1) hue-rotate(180deg)` filter (`image/image-theme.ts`) is imperceptible,
+  but the exact same transform applied to a large, prominent banner reads as broken/inverted,
+  not dark-moded. **Fix**: a decoded-pixel-dimension gate in `analyzeImage` downgrades a
+  `"flat"` verdict to `"uncertain"` whenever the image's natural width or height exceeds 512px
+  — cheap (the pixel dimensions are already computed for every sampled image; no extra
+  DOM/layout read, keeping this consistent with the rest of the codebase's effort to avoid
+  forced layout) and safe (only ever downgrades `"flat"`, never touches the `"photo"` verdict,
+  so the hard "never alter photos" guarantee is untouched). Under conservative mode (the
+  default) an `"uncertain"` image is left alone, the same fallback every other ambiguous case
+  already gets.
 
 ### Known gaps (tracked, not silently dropped)
 

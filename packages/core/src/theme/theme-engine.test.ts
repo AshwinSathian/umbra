@@ -3,7 +3,7 @@ import { contrastRatio } from "../color/contrast.js";
 import { parseCssColor } from "../color/parse.js";
 import { clearCrossOriginSheetCache, warmCrossOriginSheetCache } from "../dom/cross-origin-cache.js";
 import { OriginalValueCache } from "../dom/original-value-cache.js";
-import { VarResolutionCache, computeTheme } from "./theme-engine.js";
+import { DEFAULT_THEME_SETTINGS, RecoloredValueCache, VarResolutionCache, computeTheme } from "./theme-engine.js";
 
 describe("computeTheme", () => {
   beforeEach(() => {
@@ -389,5 +389,68 @@ describe("VarResolutionCache", () => {
     expect(rewrite).toBeDefined();
     const recolored = parseCssColor(rewrite!.value)!;
     expect(recolored.r).toBeLessThan(0.3);
+  });
+
+  it("PERF REGRESSION: reuses the memoized recolor output for a repeated (property, raw value) pair across many rules instead of resolving each independently", () => {
+    // A real stylesheet overwhelmingly repeats a small design-token palette
+    // across hundreds/thousands of selectors. Without RecoloredValueCache,
+    // the identical OKLCH/gamut-mapping/contrast-solve pipeline reruns once
+    // per rule regardless — this asserts the *output* stays correct when a
+    // shared cache is reused across many identical declarations (the
+    // dedicated RecoloredValueCache describe block below asserts the actual
+    // recompute is skipped via a spy).
+    const style = document.createElement("style");
+    style.textContent = Array.from({ length: 50 }, (_, i) => `.card-${i} { background-color: #ffffff; }`).join("\n");
+    document.head.appendChild(style);
+
+    const cache = new RecoloredValueCache();
+    const result = computeTheme(document, undefined, undefined, undefined, cache);
+    expect(result.directRewrites.length).toBe(50);
+    const values = new Set(result.directRewrites.map((r) => r.value));
+    expect(values.size).toBe(1); // every rule shares the identical recolored output
+  });
+});
+
+describe("RecoloredValueCache", () => {
+  it("skips recompute for a repeated (property, raw) pair", () => {
+    const cache = new RecoloredValueCache();
+    const compute = vi.fn(() => "rgb(1, 2, 3)");
+
+    expect(cache.resolve("#ffffff", "background-color", DEFAULT_THEME_SETTINGS, compute)).toBe("rgb(1, 2, 3)");
+    expect(cache.resolve("#ffffff", "background-color", DEFAULT_THEME_SETTINGS, compute)).toBe("rgb(1, 2, 3)");
+    expect(compute).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats the same raw value differently per property (background vs. foreground recolor differently)", () => {
+    const cache = new RecoloredValueCache();
+    const computeBg = vi.fn(() => "bg-result");
+    const computeFg = vi.fn(() => "fg-result");
+
+    expect(cache.resolve("#ffffff", "background-color", DEFAULT_THEME_SETTINGS, computeBg)).toBe("bg-result");
+    expect(cache.resolve("#ffffff", "color", DEFAULT_THEME_SETTINGS, computeFg)).toBe("fg-result");
+    expect(computeBg).toHaveBeenCalledTimes(1);
+    expect(computeFg).toHaveBeenCalledTimes(1);
+  });
+
+  it("memoizes a null (no-op / unchanged) result too, not just a truthy recolored value", () => {
+    const cache = new RecoloredValueCache();
+    const compute = vi.fn(() => null);
+
+    expect(cache.resolve("transparent", "background-color", DEFAULT_THEME_SETTINGS, compute)).toBeNull();
+    expect(cache.resolve("transparent", "background-color", DEFAULT_THEME_SETTINGS, compute)).toBeNull();
+    expect(compute).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates every entry when the settings reference changes (e.g. the user adjusts a slider), never serving output computed under stale settings", () => {
+    const cache = new RecoloredValueCache();
+    const settingsA = { ...DEFAULT_THEME_SETTINGS };
+    const settingsB = { ...DEFAULT_THEME_SETTINGS };
+    const computeUnderA = vi.fn(() => "under-a");
+    const computeUnderB = vi.fn(() => "under-b");
+
+    expect(cache.resolve("#ffffff", "background-color", settingsA, computeUnderA)).toBe("under-a");
+    // Same raw+property, but settings identity changed — must not reuse "under-a".
+    expect(cache.resolve("#ffffff", "background-color", settingsB, computeUnderB)).toBe("under-b");
+    expect(computeUnderB).toHaveBeenCalledTimes(1);
   });
 });

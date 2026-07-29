@@ -20,22 +20,28 @@ function getInputs(): Record<(typeof SLIDER_KEYS)[number], HTMLInputElement> {
   return result;
 }
 
+function conservativeToggle(): HTMLButtonElement {
+  return document.getElementById("imageConservativeMode") as HTMLButtonElement;
+}
+
 function readFormValues(inputs: Record<string, HTMLInputElement>): StoredThemeSettings {
-  const checkbox = document.getElementById("imageConservativeMode") as HTMLInputElement;
   const values: Record<string, number> = {};
   for (const key of SLIDER_KEYS) {
     values[key] = parseFloat(inputs[key]!.value);
   }
-  return { ...(values as unknown as StoredThemeSettings), imageConservativeMode: checkbox.checked };
+  return {
+    ...(values as unknown as StoredThemeSettings),
+    imageConservativeMode: conservativeToggle().getAttribute("aria-checked") === "true",
+  };
 }
 
 function applyToForm(settings: StoredThemeSettings, inputs: Record<string, HTMLInputElement>) {
   for (const key of SLIDER_KEYS) {
     inputs[key]!.value = String(settings[key]);
     const valueLabel = document.getElementById(`${key}-value`);
-    if (valueLabel) valueLabel.textContent = String(settings[key]);
+    if (valueLabel) valueLabel.textContent = settings[key].toFixed(2);
   }
-  (document.getElementById("imageConservativeMode") as HTMLInputElement).checked = settings.imageConservativeMode;
+  conservativeToggle().setAttribute("aria-checked", String(settings.imageConservativeMode));
 }
 
 async function broadcastSettingsChanged() {
@@ -74,13 +80,17 @@ async function init() {
   for (const key of SLIDER_KEYS) {
     inputs[key]!.addEventListener("input", () => {
       const valueLabel = document.getElementById(`${key}-value`);
-      if (valueLabel) valueLabel.textContent = inputs[key]!.value;
+      if (valueLabel) valueLabel.textContent = parseFloat(inputs[key]!.value).toFixed(2);
       scheduleSave(inputs);
     });
   }
-  document
-    .getElementById("imageConservativeMode")!
-    .addEventListener("change", () => scheduleSave(inputs));
+
+  conservativeToggle().addEventListener("click", () => {
+    const toggle = conservativeToggle();
+    const next = toggle.getAttribute("aria-checked") !== "true";
+    toggle.setAttribute("aria-checked", String(next));
+    scheduleSave(inputs);
+  });
 
   document.getElementById("reset")!.addEventListener("click", () => {
     applyToForm(DEFAULT_STORED_THEME_SETTINGS, inputs);
