@@ -184,6 +184,27 @@ All notable changes to this project are documented in this file. The format is b
   so the hard "never alter photos" guarantee is untouched). Under conservative mode (the
   default) an `"uncertain"` image is left alone, the same fallback every other ambiguous case
   already gets.
+- **Correction, found immediately after the fix above shipped — reported live again on the
+  same LinkedIn banner**: that fix's claim was wrong. It compared against
+  `PixelGrid.width`/`height`, but the real sampler (`image/extract-browser.ts`) always
+  downsamples every image to at most 32px on its long edge *before* `analyzeImage` ever runs
+  — coarse structure is all the classifier needs, and decoding/reading back a full-resolution
+  canvas for every image on a page is real, avoidable cost. That means `grid.width`/`height`
+  can *never* exceed 32, so the size gate could never fire in production regardless of the
+  source image's real size — it was provably dead code. It only appeared to work because its
+  unit test built a `PixelGrid` directly at full banner resolution (1584x396), which no real
+  code path ever does — bypassing the exact downsampling step that broke the fix, so the test
+  proved nothing about the real pipeline. **Real fix**: `PixelGrid` gained optional
+  `naturalWidth`/`naturalHeight` fields (`image/types.ts`), populated by
+  `sampleImageFromUrl` from `img.naturalWidth`/`naturalHeight` *before* it downsamples
+  (`image/extract-browser.ts`); the size gate in `analyzeImage` now compares against those
+  (falling back to `grid.width`/`height` when absent — correct for the existing unit tests,
+  which never downsample, so natural size and analysis size are identical there by
+  construction). Verified this time via a real-browser regression in
+  `tests/e2e/verify-extension.mjs` (a 1600x400 real canvas-generated gradient image, going
+  through the actual OffscreenCanvas downsample step) — confirmed red against the previous
+  fix (still applied the invert filter) and green against this one, rather than trusting the
+  unit test alone a second time.
 
 ### Known gaps (tracked, not silently dropped)
 

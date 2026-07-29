@@ -6,7 +6,11 @@
 //      "never alter photos" guarantee — verified in a real browser, not a
 //      synthetic pixel array.
 //   3. A flat icon-like image DOES get recolored (filter applied).
-//   4. The popup's toggle actually turns theming off and back on.
+//   4. A large image with the same flat pixel signature as #3, but shaped
+//      like a real banner/hero image, does NOT get recolored — proving the
+//      classifier's size gate holds against the real sampler's downsample
+//      step (extract-browser.ts), which no unit test can exercise.
+//   5. The popup's toggle actually turns theming off and back on.
 //
 // Run manually (not wired into CI): `node tests/e2e/verify-extension.mjs`.
 // Requires a real display (or Xvfb on Linux) — confirmed experimentally
@@ -36,6 +40,7 @@ const testPageHtml = `<!doctype html>
   <div class="card">Card content with <span style="color:#222222">dark text</span></div>
   <img id="photo" width="128" height="128" alt="photo" />
   <img id="icon" width="64" height="64" alt="icon" />
+  <img id="banner" width="1600" height="400" alt="banner" />
 </body>
 </html>`;
 
@@ -88,11 +93,11 @@ async function main() {
     // genuinely flat icon-like image at runtime using the real browser
     // canvas, then embed both as data URLs — this is real pixel data
     // decoded by the real browser, not a synthetic Uint8ClampedArray.
-    const { photoDataUrl, iconDataUrl } = await page.evaluate(() => {
-      function toDataUrl(paint) {
+    const { photoDataUrl, iconDataUrl, bannerDataUrl } = await page.evaluate(() => {
+      function toDataUrl(paint, width = 128, height = 128) {
         const c = document.createElement("canvas");
-        c.width = 128;
-        c.height = 128;
+        c.width = width;
+        c.height = height;
         const ctx = c.getContext("2d");
         paint(ctx, c.width, c.height);
         return c.toDataURL("image/png");
@@ -120,16 +125,36 @@ async function main() {
         ctx.arc(w / 2, h / 2, w / 4, 0, Math.PI * 2);
         ctx.fill();
       });
-      return { photoDataUrl, iconDataUrl };
+      // Same smooth-gradient pixel signature as the icon-sized "flat
+      // gradient" case the classifier deliberately treats as recolorable —
+      // but at LinkedIn's actual default profile-banner shape (wide,
+      // large). Real pixel data decoded by the real browser, going through
+      // the real sampler's downsample-to-32px step (extract-browser.ts),
+      // which is exactly the step a unit test cannot exercise (Vitest's
+      // happy-dom has no real canvas/image decoder) and where an earlier
+      // version of the size gate was silently dead code in production.
+      const bannerDataUrl = toDataUrl(
+        (ctx, w, h) => {
+          const gradient = ctx.createLinearGradient(0, 0, w, 0);
+          gradient.addColorStop(0, "#141414");
+          gradient.addColorStop(1, "#dcdcdc");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, w, h);
+        },
+        1600,
+        400,
+      );
+      return { photoDataUrl, iconDataUrl, bannerDataUrl };
     });
 
     step("test images generated, setting img src");
     await page.evaluate(
-      ({ photoDataUrl, iconDataUrl }) => {
+      ({ photoDataUrl, iconDataUrl, bannerDataUrl }) => {
         document.getElementById("photo").src = photoDataUrl;
         document.getElementById("icon").src = iconDataUrl;
+        document.getElementById("banner").src = bannerDataUrl;
       },
-      { photoDataUrl, iconDataUrl },
+      { photoDataUrl, iconDataUrl, bannerDataUrl },
     );
 
     step("initial image scan wait");
@@ -158,6 +183,13 @@ async function main() {
       name: "flat icon image DOES have a recolor filter applied",
       pass: iconFilter !== "none",
       detail: iconFilter,
+    });
+
+    const bannerFilter = await page.evaluate(() => getComputedStyle(document.getElementById("banner")).filter);
+    results.checks.push({
+      name: "REGRESSION: large gradient banner (same flat pixel signature as the icon, but LinkedIn-banner-sized) does NOT get a recolor filter applied",
+      pass: bannerFilter === "none",
+      detail: bannerFilter,
     });
 
     // Verify photo pixel data is byte-identical to what we generated.

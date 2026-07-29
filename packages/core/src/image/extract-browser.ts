@@ -37,7 +37,15 @@ export const sampleImageFromUrl: ImageSampler = async (url: string): Promise<Pix
     ctx.drawImage(img, 0, 0, width, height);
     const imageData = ctx.getImageData(0, 0, width, height);
 
-    return { width, height, data: imageData.data };
+    return {
+      width,
+      height,
+      data: imageData.data,
+      // Captured before the downsample above discards it — see PixelGrid's
+      // doc comment for why the classifier needs both sizes.
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+    };
   } catch {
     return null;
   }

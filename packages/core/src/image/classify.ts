@@ -50,17 +50,31 @@ const PHOTO_COLOR_DIVERSITY_MIN = 8;
 // image/image-theme.ts) to something rendered at hundreds of pixels across
 // is highly visible and reads as a broken/incorrectly-inverted image, not a
 // graceful dark-mode adaptation, even though the classifier's reasoning for
-// calling it "flat" was sound in isolation. A decoded-pixel-dimension gate
-// catches this cheaply (PixelGrid.width/height is already computed for
-// every sampled image — no extra DOM/layout read needed, keeping this
-// consistent with the rest of the codebase's effort to avoid forced
-// layout): real icons/logos/badges are essentially always well under this
-// size, while banner/hero art is essentially always well over it. Only
-// downgrades "flat" to "uncertain" (never touches "photo") — under
-// conservative mode (the default) "uncertain" is left untouched, the same
-// safe fallback every other ambiguous case already gets; it remains
-// eligible for recolor only if the user has explicitly opted out of
-// conservative mode, same as any other uncertain image.
+// calling it "flat" was sound in isolation. A size gate catches this — but
+// it MUST compare against the image's real, natural (pre-downsample) size,
+// never `PixelGrid.width`/`height`: the real sampler (extract-browser.ts)
+// always downsamples every image to at most 32px on its long edge before
+// this function ever sees it (cheap — classification only needs coarse
+// structure), so `grid.width`/`height` can *never* exceed 32 regardless of
+// the source image's actual rendered size. An earlier version of this gate
+// compared against `grid.width`/`height` directly and was provably dead
+// code in the real pipeline for exactly that reason — it only appeared to
+// work in unit tests that construct a `PixelGrid` directly at full
+// resolution, bypassing the real downsampling step entirely; confirmed live
+// on LinkedIn's actual banner still getting incorrectly recolored despite
+// that "fix". `PixelGrid.naturalWidth`/`naturalHeight` (captured by the
+// sampler before it downsamples — see types.ts) is the real signal: real
+// icons/logos/badges are essentially always well under this size, while
+// banner/hero art is essentially always well over it. Falls back to
+// `grid.width`/`height` when natural size isn't supplied (every existing
+// unit test, and any future caller that doesn't downsample) — correct
+// there since natural size and analysis size are the same thing by
+// construction when nothing was ever downsampled. Only downgrades "flat" to
+// "uncertain" (never touches "photo") — under conservative mode (the
+// default) "uncertain" is left untouched, the same safe fallback every
+// other ambiguous case already gets; it remains eligible for recolor only
+// if the user has explicitly opted out of conservative mode, same as any
+// other uncertain image.
 const MAX_FLAT_RECOLOR_DIMENSION = 512;
 
 export function analyzeImage(grid: PixelGrid): ImageAnalysis {
@@ -81,8 +95,12 @@ export function analyzeImage(grid: PixelGrid): ImageAnalysis {
   // icon-tuned "flat" treatment purely on the strength of a low-edge-
   // density/low-color-diversity pixel signature; a "photo" verdict is
   // untouched by this (the hard "never alter photos" guarantee never
-  // depends on this gate being right).
-  if (classification === "flat" && (grid.width > MAX_FLAT_RECOLOR_DIMENSION || grid.height > MAX_FLAT_RECOLOR_DIMENSION)) {
+  // depends on this gate being right). Must compare against the *natural*
+  // (pre-downsample) size, not the analysis grid's own width/height — see
+  // the doc comment above.
+  const naturalWidth = grid.naturalWidth ?? grid.width;
+  const naturalHeight = grid.naturalHeight ?? grid.height;
+  if (classification === "flat" && (naturalWidth > MAX_FLAT_RECOLOR_DIMENSION || naturalHeight > MAX_FLAT_RECOLOR_DIMENSION)) {
     classification = "uncertain";
   }
 

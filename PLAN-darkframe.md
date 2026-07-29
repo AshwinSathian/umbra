@@ -695,6 +695,57 @@ with no per-element coordinate math to get wrong. Re-verified visually (ON/OFF/t
 states, real click interactions against a stateful mock of the `chrome.*` APIs) before
 considering the control done.
 
+### Correction: the banner-size gate above was itself dead code — reported live again, same banner
+
+The size-gate fix above shipped, and the exact same LinkedIn banner was still getting
+`invert(1) hue-rotate(180deg)` applied — reported live, again, via a fresh screenshot. Re-
+investigated via `superpowers:systematic-debugging` rather than patching further blind (Phase 4's
+own "3+ fixes failed → question the architecture" isn't triggered yet at fix #2, but the *process*
+still applies: re-open Phase 1, don't guess).
+
+**Root cause.** The gate compared a `"flat"` verdict's eligibility against `grid.width`/
+`grid.height` — but `image/extract-browser.ts`'s `sampleImageFromUrl` (the real sampler; the one
+and only implementation of `ImageSampler` a shipped extension actually uses) always downsamples
+every sampled image to at most 32px on its long edge (`MAX_ANALYSIS_DIMENSION = 32`) *before*
+`analyzeImage` ever sees it — classification only needs coarse structure, and decoding/reading
+back a full-resolution canvas for every image on a page would be real, unnecessary cost. That
+means `grid.width`/`grid.height`, inside `analyzeImage`, can **never** exceed 32 — the size gate
+could not have fired in production for *any* image, regardless of its real rendered size. It was
+provably inert the moment it was written. Confirmed directly by reading `extract-browser.ts`
+(not by trial and error): the downsample happens unconditionally, several lines before the
+returned `PixelGrid`'s `width`/`height` are even assigned.
+
+**Why the unit test didn't catch it.** `classify.test.ts`'s regression fixture for this case built
+a `PixelGrid` *directly* at full banner resolution (1584×396) — a valid `PixelGrid` value, and a
+faithful test of `analyzeImage`'s own logic in isolation, but not a faithful *simulation of the
+real pipeline*, since no real code path ever hands `analyzeImage` an un-downsampled grid. The test
+proved the gate's arithmetic was correct; it could not have proven the gate ever receives a value
+capable of tripping it, because building the fixture bypassed the exact step (downsampling) that
+neutralizes it. `extract-browser.ts`'s own doc comment already says as much — "intentionally not
+unit-tested here... exercised by the Playwright end-to-end suite instead" — but the size-gate work
+added a *unit* test only and treated it as sufficient proof, which this incident shows it wasn't,
+for a bug that only exists at the seam between two modules neither of which was tested together.
+
+**Real fix.** `PixelGrid` (`image/types.ts`) gained optional `naturalWidth`/`naturalHeight`
+fields — the source image's real decoded size, distinct from `width`/`height` (the analysis
+grid's, possibly-downsampled, dimensions). `sampleImageFromUrl` now captures
+`img.naturalWidth`/`naturalHeight` before it downsamples and includes them in the returned grid.
+`analyzeImage`'s gate now compares against `grid.naturalWidth ?? grid.width` (same for height) —
+falling back to the analysis dimensions when natural size isn't supplied, which is exactly correct
+for every existing unit test (none of which downsample, so natural size and analysis size are
+identical there by construction) without requiring every test fixture to be rewritten.
+
+**Verification, this time.** Added a real-browser E2E regression to
+`tests/e2e/verify-extension.mjs`: a 1600×400 real `<canvas>`-generated smooth gradient (same
+low-edge-density/low-color-diversity signature as the existing flat-icon fixture, at banner scale),
+embedded as a real `<img>`, going through the actual `OffscreenCanvas` downsample step in a real,
+installed, real-Chromium extension — not a synthetic `PixelGrid`. Before trusting it, ran it
+red/green deliberately: `git stash`ed only the fix files (keeping the new test active), rebuilt,
+confirmed the check **failed** (`invert(1) hue-rotate(180deg)` still applied) against the
+pre-fix code, restored the fix, rebuilt, confirmed it **passed**. This is the standard this class
+of bug needed and the previous pass skipped — proof the specific real pipeline this bug lives in
+was actually exercised, not just the classifier function in isolation.
+
 ## 🧪 Testing Strategy
 
 - **Unit tests (Vitest)**: `packages/core/color` (OKLCH round-trip, gamut mapping, contrast solver — property-based + fixed-case tests), `packages/core/image` (classifier decision table against synthetic fixtures), `packages/core/dom` (style discovery against jsdom/happy-dom fixtures, injector mutation-free guarantee). Target ≥ 90% line coverage on `packages/core`.

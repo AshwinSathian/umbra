@@ -46,13 +46,26 @@ const linearGradientGrid = makeGrid(32, 32, (x) => {
 });
 
 /** Same smooth-gradient pixel signature as linearGradientGrid (few distinct
- * colors, no sharp local edges) but at large-banner dimensions — the exact
- * shape of LinkedIn's default profile cover-photo asset, confirmed live as
- * the source of a reported "images look inverted" bug. */
-const largeGradientBannerGrid = makeGrid(1584, 396, (x) => {
-  const t = x / 1583;
-  return [Math.round(20 + t * 200), Math.round(20 + t * 200), Math.round(20 + t * 200), 255];
-});
+ * colors, no sharp local edges), but shaped like what the *real* sampler
+ * (extract-browser.ts) actually hands the classifier for a large banner:
+ * the analysis grid itself is always downsampled to at most 32px on its
+ * long edge (32x8 here, matching a 1584x396 source scaled down), with the
+ * true pre-downsample size carried separately via naturalWidth/
+ * naturalHeight. Using the *real* source dimensions (1584x396 — LinkedIn's
+ * actual default profile cover-photo banner shape) as `width`/`height`
+ * directly, as an earlier version of this fixture did, does not reproduce
+ * the real pipeline at all and let a provably-dead gate pass this test
+ * while still being broken live — see the REGRESSION test below this one. */
+function bannerShapedAnalysisGrid(): PixelGrid {
+  return makeGrid(32, 8, (x) => {
+    const t = x / 31;
+    return [Math.round(20 + t * 200), Math.round(20 + t * 200), Math.round(20 + t * 200), 255];
+  });
+}
+
+function largeBannerAnalysisGrid(): PixelGrid {
+  return { ...bannerShapedAnalysisGrid(), naturalWidth: 1584, naturalHeight: 396 };
+}
 
 const noisePhotoGrid = (() => {
   const rand = mulberry32(11);
@@ -121,9 +134,24 @@ describe("analyzeImage", () => {
     // transform is imperceptible. "uncertain" (not "flat") is the correct
     // verdict here: under conservative mode (the default) it is left
     // untouched, same as any other ambiguous image.
-    const analysis = analyzeImage(largeGradientBannerGrid);
+    const analysis = analyzeImage(largeBannerAnalysisGrid());
     expect(analysis.classification).toBe("uncertain");
     expect(shouldRecolorImage(analysis, true)).toBe(false);
+  });
+
+  it("REGRESSION: a prior version of this gate compared against the DOWNSAMPLED analysis grid's own size and was dead code — still classifies flat when naturalWidth/naturalHeight aren't supplied at all", () => {
+    // Documents exactly why the fix above must key off naturalWidth/
+    // naturalHeight rather than grid.width/height: the real sampler
+    // (extract-browser.ts) always downsamples to <=32px before this
+    // function ever runs, so grid.width/height can never reflect a large
+    // source image's real size — an earlier "fix" that compared against
+    // grid.width/height directly was provably inert in production despite
+    // passing a unit test built at full resolution (bypassing the real
+    // downsample step). This test uses the identical downsampled analysis
+    // content as the REGRESSION test above but withholds naturalWidth/
+    // naturalHeight, proving the gate is a genuine no-op without that
+    // signal — the real sampler supplying it is load-bearing, not optional.
+    expect(analyzeImage(bannerShapedAnalysisGrid()).classification).toBe("flat");
   });
 
   it("THE key regression case: a bright product photo on a white background is never classified as flat, despite a high global mean lightness", () => {
