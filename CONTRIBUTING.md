@@ -1,7 +1,7 @@
 # Contributing to Darkframe
 
 Thanks for considering contributing. This is a small, solo-maintained project, so please
-keep pull requests focused — small, reviewable changes get merged much faster than large
+keep pull requests focused: small, reviewable changes get merged much faster than large
 ones.
 
 ## Getting started
@@ -15,36 +15,36 @@ pnpm typecheck
 ```
 
 To build and try the extension in a real Chrome and/or Safari in one step, run
-`pnpm install:local` — see [README.md](./README.md#try-it-now-before-either-store-listing-is-live).
+`pnpm install:local`. See [README.md](./README.md#try-it-now-before-either-store-listing-is-live).
 For the individual manual commands: [Chrome](./README.md#running-the-chrome-extension-locally),
-[Safari](./README.md#running-the-safari-extension-locally-macos-free--no-apple-developer-account-required).
+[Safari](./README.md#running-the-safari-extension-locally-macos-free-no-apple-developer-account-required).
 
 ## Before opening a PR
 
-- Run `pnpm lint && pnpm typecheck && pnpm test` locally — CI runs the same checks and will
+- Run `pnpm lint && pnpm typecheck && pnpm test` locally. CI runs the same checks and will
   fail the same way.
 - Add tests for any new behavior. Every module in `packages/core` has a colocated
   `*.test.ts` file; follow that pattern.
 - If your change affects the Chrome extension's runtime behavior, re-run
-  `node tests/e2e/verify-extension.mjs` locally (requires a real display — it loads the
+  `node tests/e2e/verify-extension.mjs` locally (requires a real display, since it loads the
   actual built extension into a real Chromium instance via Playwright) and paste its output
   into the PR description.
 - Update [PLAN-darkframe.md](./PLAN-darkframe.md) if your change affects the documented architecture,
-  adds/removes a phase task, or fixes a bug worth recording for posterity — this file is the
+  adds/removes a phase task, or fixes a bug worth recording for posterity. This file is the
   project's running design log, not just an initial planning doc.
 
 ## Code style
 
 - TypeScript strict mode, no `any`/`as any`/`@ts-ignore` without a very good reason (there
-  are currently zero in the codebase — let's keep it that way).
+  are currently zero in the codebase, let's keep it that way).
 - Prettier + ESLint are enforced in CI (`pnpm lint`). Run `pnpm format` locally if unsure.
-- Comments should explain *why*, not *what* — see the existing codebase for the intended
-  tone. Don't add comments that just restate the code.
+- Comments should explain *why*, not *what*. See the existing codebase for the intended
+  tone, and don't add comments that just restate the code.
 
 ## Reporting bugs / requesting features
 
-Open a GitHub issue. For security vulnerabilities, see [SECURITY.md](./SECURITY.md) instead
-— please don't open a public issue for those.
+Open a GitHub issue. For security vulnerabilities, see [SECURITY.md](./SECURITY.md) instead;
+please don't open a public issue for those.
 
 ## License
 

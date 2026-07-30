@@ -4,14 +4,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](./tsconfig.base.json)
 
-A free, open-source, cross-browser dark-mode engine for Chrome and Safari — built as a
+A free, open-source, cross-browser dark-mode engine for Chrome and Safari, built as a
 constructive overhaul of Dark Reader's approach, with three explicit goals:
 
 1. **Images and video are never altered.** Photos are classified using local contrast/edge
    density, not just global lightness, and the engine is biased to leave anything it's
    unsure about untouched. `<video>`/`<canvas>`/`<audio>` are unconditionally excluded.
 2. **Minimal disruption to the page.** Theming is applied as a single additive `@layer`
-   stylesheet — original page stylesheets are never rewritten in place (with a
+   stylesheet: original page stylesheets are never rewritten in place (with a
    CSSOM-direct-rewrite fallback for engines without Cascade Layer support).
 3. **Fully free, on every platform, including Safari.** No paid tier, no purchase, ever.
 
@@ -22,27 +22,27 @@ and open questions.
 
 Phases 0–5 of the plan are built: the core color/DOM/image engine (`packages/core` +
 `packages/shared`, 144 passing unit tests), a working Chrome MV3 extension
-(`packages/ext-chrome`, verified end-to-end against a real Chromium instance — see
+(`packages/ext-chrome`, verified end-to-end against a real Chromium instance, see
 `tests/e2e/verify-extension.mjs`), and a real, buildable macOS Safari Web Extension Xcode
 project (`packages/ext-safari`, generated via Apple's `safari-web-extension-converter` and
 confirmed to build and launch locally with free ad-hoc code signing).
 
-Both store listings are fully prepared — packaged build, screenshots, promo art, and every
-required piece of listing/privacy copy — but not yet submitted: the Chrome Web Store
+Both store listings are fully prepared, with a packaged build, screenshots, promo art, and
+every required piece of listing/privacy copy, but not yet submitted: the Chrome Web Store
 submission just needs a developer-account action, and the Safari/Mac App Store submission is
 blocked on Apple Developer Program identity verification currently in progress. See
 [RELEASING.md](./RELEASING.md) for the full step-by-step path and [`store/`](./store) for the
 prepared listing copy and generated assets for both platforms.
 
 The project has also been through a dedicated adversarial security audit and an independent
-architecture/quality audit — see PLAN-darkframe.md's "Security Hardening" section for the two
+architecture/quality audit. See PLAN-darkframe.md's "Security Hardening" section for the two
 real vulnerabilities found and fixed, and the "Follow-up Work" / Data Flow sections for the
 quality findings addressed.
 
 ## Try it now (before either store listing is live)
 
 Neither store submission is live yet (see [RELEASING.md](./RELEASING.md)), but nothing about
-that blocks using Darkframe today — one script builds it from source and gets it into a real
+that blocks using Darkframe today. One script builds it from source and gets it into a real
 Chrome and/or Safari on this machine:
 
 ```sh
@@ -51,12 +51,12 @@ pnpm install:local            # builds + sets up whatever this OS supports
 ```
 
 It installs dependencies, builds the extension, structurally validates the build output
-(catches a truncated build before you try to load it), and — unless `--no-open` is
-passed — opens a detected Chromium-family browser straight to `chrome://extensions` (with
+(catches a truncated build before you try to load it), and, unless `--no-open` is
+passed, opens a detected Chromium-family browser straight to `chrome://extensions` (with
 the unpacked-extension folder path already on your clipboard) and, on macOS, builds the
 Safari Xcode project and launches the resulting app. The one manual click each browser still
 requires ("Load unpacked" in Chrome, enabling the extension in Safari's Settings) is a
-deliberate security boundary neither browser exposes to scripts — see the comment at the top
+deliberate security boundary neither browser exposes to scripts. See the comment at the top
 of [`scripts/install-local.mjs`](./scripts/install-local.mjs) for the full option list
 (`--chrome`, `--safari`, `--all`, `--no-open`, `--verify`, `--skip-install`, `--help`) and
 what each target validates. Safe to re-run any time, e.g. after pulling new changes.
@@ -91,7 +91,7 @@ popup/background toggle):
 node tests/e2e/verify-extension.mjs
 ```
 
-## Running the Safari extension locally (macOS, free — no Apple Developer account required)
+## Running the Safari extension locally (macOS, free, no Apple Developer account required)
 
 Requires Xcode. This builds and runs entirely locally with ad-hoc code signing; no App
 Store submission or paid Apple Developer Program membership is needed just to build and use
@@ -108,7 +108,7 @@ Security > Extensions** and, on some macOS versions, enabling "Allow unsigned ex
 via `safari.developer` menu / `defaults write` for local development builds).
 
 A signed, notarized build that a non-technical user could install with one click (rather
-than building from source) requires an Apple Developer Program membership ($99/year) — the
+than building from source) requires an Apple Developer Program membership ($99/year). The
 project has committed to this and enrollment is in progress (pending Apple's identity
 verification); see [RELEASING.md](./RELEASING.md) for the Mac App Store submission path once
 that clears. The extension itself has no purchase price either way.
@@ -120,7 +120,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md). This project follows the
 
 ## Security
 
-Found a vulnerability? Please see [SECURITY.md](./SECURITY.md) — don't open a public issue
+Found a vulnerability? Please see [SECURITY.md](./SECURITY.md), don't open a public issue
 for it.
 
 ## Changelog
@@ -135,4 +135,4 @@ assets for both platforms.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT, see [LICENSE](./LICENSE).

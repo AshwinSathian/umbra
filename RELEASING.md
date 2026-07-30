@@ -2,8 +2,8 @@
 
 This is the step-by-step path from "code is ready" (where this repo is right now) to
 "installable from the Chrome Web Store and the Mac App Store." Everything that could be
-prepared in advance — listing copy, screenshots, permission justifications, privacy
-disclosures, the upload package itself — already exists in this repo. What's left is a set of
+prepared in advance already exists in this repo: listing copy, screenshots, permission
+justifications, privacy disclosures, the upload package itself. What's left is a set of
 actions only you can take: creating accounts, paying fees, and clicking submit. This doc is
 the checklist for those.
 
@@ -15,21 +15,21 @@ the checklist for those.
 | Listing copy written | ✅ `store/chrome/listing.md` | ✅ `store/safari/app-store-connect.md` |
 | Store images generated | ✅ `store/chrome/screenshots/`, `store/chrome/promo/` | ✅ starter set in `store/safari/screenshots/` (see note below) |
 | Upload package | ✅ `node scripts/package-chrome.mjs` → `store/chrome/build/darkframe-chrome-v1.0.0.zip` | ⏳ needs a signed Xcode archive (can't be done until your Apple Developer account is approved) |
-| Developer account | ⏳ needs a one-time $5 fee + your action | ⏳ **pending** — you have a submitted Apple Developer Program enrollment awaiting identity verification |
+| Developer account | ⏳ needs a one-time $5 fee + your action | ⏳ **pending**: you have a submitted Apple Developer Program enrollment awaiting identity verification |
 | Privacy policy | ✅ `PRIVACY.md`, publicly reachable via raw GitHub URL | ✅ same file, referenced in the App Privacy questionnaire |
 
-Nothing below requires more engineering work first — it's account/payment/review steps.
+Nothing below requires more engineering work first: it's account/payment/review steps.
 
 ## Part 1: Chrome Web Store
 
-This part has no external dependency — you can do it today.
+This part has no external dependency, so you can do it today.
 
 ### 1. Create/access your developer account
 
 1. Go to https://chrome.google.com/webstore/devconsole.
 2. Sign in with the Google account you want to own this listing.
 3. If you haven't registered as a Chrome Web Store developer before, you'll be asked for a
-   **one-time $5 registration fee**. This is paid once, ever, per Google account — not per
+   **one-time $5 registration fee**. This is paid once, ever, per Google account, not per
    extension.
 
 ### 2. Build the upload package
@@ -38,7 +38,7 @@ This part has no external dependency — you can do it today.
 node scripts/package-chrome.mjs
 ```
 
-This produces `store/chrome/build/darkframe-chrome-v1.0.0.zip` (gitignored — it's a build
+This produces `store/chrome/build/darkframe-chrome-v1.0.0.zip` (gitignored: it's a build
 artifact, regenerate it any time). Re-run this any time you bump the version.
 
 ### 3. Create the item and upload
@@ -59,7 +59,7 @@ Open `store/chrome/listing.md` and copy each field across:
 
 Also from `store/chrome/listing.md`:
 - Single purpose description
-- Permission justifications (one per requested permission — `storage` and
+- Permission justifications (one per requested permission: `storage` and
   `host_permissions`)
 - "Are you using remote code?" → **No**
 - Data usage disclosure table → all **No** (nothing is collected)
@@ -76,12 +76,12 @@ Also from `store/chrome/listing.md`:
 
 Click **Submit for Review**. Chrome Web Store review typically takes a few hours to a few
 days for a new listing (first submissions and anything requesting broad host permissions
-tend toward the slower end — expect up to a couple of weeks in the worst case, though that's
+tend toward the slower end, expect up to a couple of weeks in the worst case, though that's
 uncommon). You'll get an email when it's approved or if the reviewer needs changes.
 
 **If the reviewer flags the `host_permissions: <all_urls>` grant**: point them at the
-permission justification text already in the dashboard (also in `store/chrome/listing.md`) —
-this is a well-understood, common permission class for dynamic dark-mode extensions, and the
+permission justification text already in the dashboard (also in `store/chrome/listing.md`).
+This is a well-understood, common permission class for dynamic dark-mode extensions, and the
 justification explains why narrower permissions don't work for this product.
 
 ### 8. After approval
@@ -101,7 +101,7 @@ moment that clears.
 
 ### 0. Wait for approval
 
-Check https://developer.apple.com/account — enrollment status shows there. Apple's identity
+Check https://developer.apple.com/account. Enrollment status shows there. Apple's identity
 verification can take anywhere from same-day to a couple of weeks depending on what
 additional documentation they ask for. Nothing below can proceed until this shows
 **Active**.
@@ -113,7 +113,7 @@ Once approved, in the Apple Developer portal → **Certificates, Identifiers & P
 1. Register a new App ID: `com.darkframe.app` (the container app).
 2. Register its associated extension App ID: `com.darkframe.app.Extension`.
 3. Both are already set as the `PRODUCT_BUNDLE_IDENTIFIER` in
-   `packages/ext-safari/Darkframe/Darkframe.xcodeproj/project.pbxproj` — you're just
+   `packages/ext-safari/Darkframe/Darkframe.xcodeproj/project.pbxproj`. You're just
    registering the identifiers Apple's side, not changing anything in the project.
 
 ### 2. Set up signing in Xcode
@@ -123,7 +123,7 @@ Once approved, in the Apple Developer portal → **Certificates, Identifiers & P
 3. Switch **Team** from "None" to your Apple Developer team.
 4. Repeat for the **Darkframe Extension** target.
 5. With "Automatically manage signing" checked (the default), Xcode provisions everything
-   itself — no manual certificate/profile juggling needed for a straightforward app like
+   itself, no manual certificate/profile juggling needed for a straightforward app like
    this one.
 6. Build once (⌘B) to confirm it still builds clean with real signing instead of the
    "Sign to Run Locally" ad-hoc identity used during development.
@@ -139,7 +139,7 @@ Once approved, in the Apple Developer portal → **Certificates, Identifiers & P
 
 Open `store/safari/app-store-connect.md` and copy each field across: name, subtitle,
 category, age rating, pricing, App Privacy answers, description, keywords, support/marketing
-URLs, and the App Review notes (important — Safari extensions are invisible until manually
+URLs, and the App Review notes (important: Safari extensions are invisible until manually
 enabled, and reviewers need to be told how).
 
 **Before uploading screenshots**: the doc recommends replacing at least the first screenshot
@@ -150,7 +150,7 @@ pnpm --filter @darkframe/ext-safari build:xcode
 then run the built app, enable the extension in **Safari → Settings → Extensions**, visit a
 real website, and take a screenshot (⌘⇧4, or ⌘⇧5 for more control) at one of Apple's accepted
 sizes (1280×800, 1440×900, 2560×1600, or 2880×1800). The existing generated images in
-`store/safari/screenshots/` are valid to use as-is if you'd rather not do this manual step —
+`store/safari/screenshots/` are valid to use as-is if you'd rather not do this manual step;
 they're accurate, just not literally captured inside Safari's window chrome.
 
 ### 5. Archive and upload the build
@@ -169,7 +169,7 @@ they're accurate, just not literally captured inside Safari's window chrome.
 
 Click **Add for Review** → **Submit to App Review**. Apple's typical review time is 24–48
 hours for a straightforward app, though Safari Web Extensions sometimes take a reviewer a
-little longer since they have to manually enable the extension to test it — the App Review
+little longer since they have to manually enable the extension to test it. The App Review
 notes you filled in step 4 are there specifically to make that fast.
 
 ### 7. After approval
@@ -177,7 +177,7 @@ notes you filled in step 4 are there specifically to make that fast.
 - The app goes live at its Mac App Store URL.
 - Update `README.md`'s Safari section to lead with the App Store install link, keeping the
   build-from-source path as a secondary "want to build it yourself, or can't wait for
-  review" option — don't delete that path, it's the only route available to anyone before
+  review" option. Don't delete that path: it's the only route available to anyone before
   this ships and remains valuable for contributors/auditors.
 
 ## Interim: build-from-source stays available throughout, for both platforms
@@ -185,7 +185,7 @@ notes you filled in step 4 are there specifically to make that fast.
 Nothing above blocks anyone with this repo from using Darkframe today, on either platform.
 `README.md`'s "Try it now" section documents `pnpm install:local`
 (`scripts/install-local.mjs`), which builds from source and does as much of the local
-Chrome/Safari setup as either browser lets a script do — no store listing, no Apple Developer
+Chrome/Safari setup as either browser lets a script do: no store listing, no Apple Developer
 Program dependency (ad-hoc "Sign to Run Locally" signing for Safari, confirmed working in
 this repo's history). Keep pointing people there until both listings are live, and keep the
 instructions (and the script) afterward for anyone who prefers building from source or wants
@@ -193,11 +193,11 @@ to audit the exact code running in their browser.
 
 ## Tagging a release
 
-Once you've submitted (or, if you'd rather wait for actual approval — your call) to at least
+Once you've submitted (or, if you'd rather wait for actual approval, your call) to at least
 one store:
 
 ```sh
-git tag -a v1.0.0 -m "v1.0.0 — first public release"
+git tag -a v1.0.0 -m "v1.0.0: first public release"
 git push origin v1.0.0
 ```
 
@@ -205,17 +205,17 @@ And update `CHANGELOG.md`: rename the `## [Unreleased]` heading to `## [1.0.0] -
 date>`, and add a fresh empty `## [Unreleased]` section above it for whatever comes next.
 
 Consider also creating a GitHub Release (`gh release create v1.0.0`) with
-`store/chrome/build/darkframe-chrome-v1.0.0.zip` attached — gives people a way to
+`store/chrome/build/darkframe-chrome-v1.0.0.zip` attached. This gives people a way to
 side-load/audit the exact submitted build without waiting on either store's review queue.
 
 ## Keeping both listings in sync on future versions
 
 1. Bump the version: `package.json` (root + every `packages/*/package.json`),
-   `packages/ext-chrome/manifest.json`, and the Xcode project's `MARKETING_VERSION` (Xcode →
-   target → General tab, or edit `project.pbxproj` directly — both `Darkframe` and `Darkframe
+   `packages/ext-chrome/manifest.json`, and the Xcode project's `MARKETING_VERSION` (Xcode,
+   target, General tab, or edit `project.pbxproj` directly: both `Darkframe` and `Darkframe
    Extension` targets, all four build configurations).
 2. Regenerate assets if the product's visuals changed:
-   `node scripts/generate-store-assets.mjs` (Chrome screenshots/promo — safe to also reuse
+   `node scripts/generate-store-assets.mjs` (Chrome screenshots/promo, safe to also reuse
    for Safari per the note above).
 3. Rebuild the Chrome package: `node scripts/package-chrome.mjs`.
 4. Update `CHANGELOG.md` with what changed.
@@ -231,10 +231,10 @@ side-load/audit the exact submitted build without waiting on either store's revi
 ## A note on the `host_permissions: <all_urls>` review risk
 
 This is the one part of both submissions most likely to draw reviewer questions, on both
-platforms — any extension that needs to read/modify every page a user visits looks the same
+platforms. Any extension that needs to read/modify every page a user visits looks the same
 to an automated policy scanner whether it's doing something benign (recoloring pages) or
 something invasive (harvesting data). The justification text in both listing docs is written
 to preempt that question directly. If either store's review comes back asking for more detail
-specifically about this permission, the honest, accurate answer is already written — point
+specifically about this permission, the honest, accurate answer is already written. Point
 them at it rather than writing a new one from scratch, so the story stays consistent across
 both platforms and against `PRIVACY.md`.

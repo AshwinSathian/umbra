@@ -6,8 +6,8 @@ kind in this codebase.
 
 ## What the extension can see
 
-Darkframe requests broad host permissions (`http://*/*`, `https://*/*`) because its purpose —
-recoloring arbitrary web pages — requires reading each page's stylesheets, DOM, and images
+Darkframe requests broad host permissions (`http://*/*`, `https://*/*`) because its purpose,
+recoloring arbitrary web pages, requires reading each page's stylesheets, DOM, and images
 to compute a theme. This is the same class of permission any dynamic dark-mode extension
 (including Dark Reader) requires, and is used only to:
 
@@ -20,7 +20,7 @@ any Darkframe-controlled server anywhere in this codebase.
 
 ## What is stored
 
-Only your own settings — whether Darkframe is enabled globally and per-site overrides — are
+Only your own settings, whether Darkframe is enabled globally and per-site overrides, are
 stored locally via the browser's own extension storage (`chrome.storage.local` / the
 Safari Web Extension equivalent). This storage is local to your browser profile and is
 not synced to any Darkframe server (browser-level sync, if you have Chrome/Safari sync

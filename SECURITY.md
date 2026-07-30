@@ -1,6 +1,6 @@
 # Security Policy
 
-Darkframe runs with broad host permissions (`http://*/*`, `https://*/*`) by necessity — recoloring
+Darkframe runs with broad host permissions (`http://*/*`, `https://*/*`) by necessity: recoloring
 arbitrary pages requires reading their stylesheets, DOM, and images. That makes this
 extension a meaningful place to report security issues responsibly.
 
@@ -11,7 +11,7 @@ Please **do not** open a public GitHub issue for a security vulnerability. Inste
 1. Open a [private security advisory](../../security/advisories/new) on this repository (GitHub's
    "Report a vulnerability" flow under the Security tab), or
 2. If that isn't available to you, email the maintainer directly with a description of the
-   issue, the affected file(s)/version, and — if possible — a proof-of-concept.
+   issue, the affected file(s)/version, and, if possible, a proof-of-concept.
 
 Please include:
 
@@ -37,6 +37,6 @@ Please include:
 
 ## Response
 
-This is a solo-maintained open-source project — response times are best-effort, not
+This is a solo-maintained open-source project, so response times are best-effort, not
 SLA-backed. Confirmed vulnerabilities will be fixed and disclosed via a GitHub Security
 Advisory and a new release; credit will be given unless you ask not to be named.
